@@ -18,6 +18,11 @@
 		A10000000000000000000009 /* Book.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* Book.swift */; };
 		A10000000000000000000010 /* AddBookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* AddBookView.swift */; };
 		A10000000000000000000011 /* BookDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* BookDetailView.swift */; };
+		A10000000000000000000012 /* Author.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* Author.swift */; };
+		A10000000000000000000013 /* Series.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* Series.swift */; };
+		A10000000000000000000014 /* SeriesBook.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* SeriesBook.swift */; };
+		A10000000000000000000015 /* UserBook.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* UserBook.swift */; };
+		A10000000000000000000016 /* ReadingStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* ReadingStatus.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +38,11 @@
 		A20000000000000000000010 /* Book.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Book.swift; sourceTree = "<group>"; };
 		A20000000000000000000011 /* AddBookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddBookView.swift; sourceTree = "<group>"; };
 		A20000000000000000000012 /* BookDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookDetailView.swift; sourceTree = "<group>"; };
+		A20000000000000000000013 /* Author.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Author.swift; sourceTree = "<group>"; };
+		A20000000000000000000014 /* Series.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Series.swift; sourceTree = "<group>"; };
+		A20000000000000000000015 /* SeriesBook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeriesBook.swift; sourceTree = "<group>"; };
+		A20000000000000000000016 /* UserBook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserBook.swift; sourceTree = "<group>"; };
+		A20000000000000000000017 /* ReadingStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingStatus.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,7 +62,7 @@
 		A30000000000000000000010 /* Settings */ = {isa = PBXGroup; children = (A20000000000000000000006 /* SettingsView.swift */); path = Settings; sourceTree = "<group>"; };
 		A30000000000000000000011 /* Shared */ = {isa = PBXGroup; children = (A30000000000000000000012 /* Components */); path = Shared; sourceTree = "<group>"; };
 		A30000000000000000000012 /* Components */ = {isa = PBXGroup; children = (A20000000000000000000007 /* PlaceholderContentView.swift */); path = Components; sourceTree = "<group>"; };
-		A30000000000000000000013 /* Models */ = {isa = PBXGroup; children = (A20000000000000000000010 /* Book.swift */); path = Models; sourceTree = "<group>"; };
+		A30000000000000000000013 /* Models */ = {isa = PBXGroup; children = (A20000000000000000000010 /* Book.swift */, A20000000000000000000013 /* Author.swift */, A20000000000000000000014 /* Series.swift */, A20000000000000000000015 /* SeriesBook.swift */, A20000000000000000000016 /* UserBook.swift */, A20000000000000000000017 /* ReadingStatus.swift */); path = Models; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -68,7 +78,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A50000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001 /* BookBuddyApp.swift in Sources */, A10000000000000000000002 /* RootTabView.swift in Sources */, A10000000000000000000003 /* LibraryView.swift in Sources */, A10000000000000000000004 /* RadarView.swift in Sources */, A10000000000000000000005 /* CalendarView.swift in Sources */, A10000000000000000000006 /* SettingsView.swift in Sources */, A10000000000000000000007 /* PlaceholderContentView.swift in Sources */, A10000000000000000000009 /* Book.swift in Sources */, A10000000000000000000010 /* AddBookView.swift in Sources */, A10000000000000000000011 /* BookDetailView.swift in Sources */); runOnlyForDeploymentPostprocessing = 0; };
+		A50000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001 /* BookBuddyApp.swift in Sources */, A10000000000000000000002 /* RootTabView.swift in Sources */, A10000000000000000000003 /* LibraryView.swift in Sources */, A10000000000000000000004 /* RadarView.swift in Sources */, A10000000000000000000005 /* CalendarView.swift in Sources */, A10000000000000000000006 /* SettingsView.swift in Sources */, A10000000000000000000007 /* PlaceholderContentView.swift in Sources */, A10000000000000000000009 /* Book.swift in Sources */, A10000000000000000000010 /* AddBookView.swift in Sources */, A10000000000000000000011 /* BookDetailView.swift in Sources */, A10000000000000000000012 /* Author.swift in Sources */, A10000000000000000000013 /* Series.swift in Sources */, A10000000000000000000014 /* SeriesBook.swift in Sources */, A10000000000000000000015 /* UserBook.swift in Sources */, A10000000000000000000016 /* ReadingStatus.swift in Sources */); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */

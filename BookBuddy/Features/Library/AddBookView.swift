@@ -4,6 +4,7 @@ import SwiftData
 struct AddBookView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Query private var authors: [Author]
 
     @State private var title = ""
     @State private var authorName = ""
@@ -56,15 +57,17 @@ struct AddBookView: View {
 
     private func saveBook() {
         let trimmedReview = review.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedAuthor = authorName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let author = authors.first { $0.name.compare(trimmedAuthor, options: .caseInsensitive) == .orderedSame } ?? Author(name: trimmedAuthor)
+        if author.modelContext == nil { modelContext.insert(author) }
         let book = Book(
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-            authorName: authorName.trimmingCharacters(in: .whitespacesAndNewlines),
-            readingStatus: readingStatus,
-            rating: rating == 0 ? nil : rating,
-            review: trimmedReview.isEmpty ? nil : trimmedReview
+            author: author
         )
+        let userBook = UserBook(book: book, readingStatus: readingStatus, rating: rating == 0 ? nil : Double(rating), review: trimmedReview.isEmpty ? nil : trimmedReview)
 
         modelContext.insert(book)
+        modelContext.insert(userBook)
         dismiss()
     }
 }

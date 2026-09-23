@@ -7,6 +7,6 @@ struct BookBuddyApp: App {
         WindowGroup {
             RootTabView()
         }
-        .modelContainer(for: Book.self)
+        .modelContainer(for: [Author.self, Book.self, Series.self, SeriesBook.self, UserBook.self])
     }
 }

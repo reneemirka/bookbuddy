@@ -3,7 +3,7 @@ import SwiftData
 
 struct LibraryView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Book.title) private var books: [Book]
+    @Query(sort: \UserBook.addedAt, order: .reverse) private var books: [UserBook]
     @State private var isPresentingAddBook = false
 
     var body: some View {
@@ -17,11 +17,13 @@ struct LibraryView: View {
                     )
                 } else {
                     List {
-                        ForEach(books) { book in
-                            NavigationLink {
-                                BookDetailView(book: book)
-                            } label: {
-                                BookRow(book: book)
+                        ForEach(books) { userBook in
+                            if let book = userBook.book {
+                                NavigationLink {
+                                    BookDetailView(userBook: userBook)
+                                } label: {
+                                    BookRow(userBook: userBook, book: book)
+                                }
                             }
                         }
                         .onDelete(perform: deleteBooks)
@@ -50,15 +52,16 @@ struct LibraryView: View {
 }
 
 private struct BookRow: View {
+    let userBook: UserBook
     let book: Book
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(book.title)
                 .font(.headline)
-            Text(book.authorName)
+            Text(book.author?.name ?? "Unknown Author")
                 .foregroundStyle(.secondary)
-            Text(book.readingStatus.title)
+            Text(userBook.readingStatus.title)
                 .font(.caption)
                 .foregroundStyle(.tint)
         }
