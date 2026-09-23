@@ -49,8 +49,10 @@ struct BookDetailView: View {
         .navigationTitle("Book Details")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            Button("Edit") {
-                isPresentingEditor = true
+            ToolbarItem(placement: .primaryAction) {
+                Button("Edit") {
+                    isPresentingEditor = true
+                }
             }
         }
         .sheet(isPresented: $isPresentingEditor) {
