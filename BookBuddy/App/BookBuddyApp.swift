@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 @main
 struct BookBuddyApp: App {
@@ -6,5 +7,6 @@ struct BookBuddyApp: App {
         WindowGroup {
             RootTabView()
         }
+        .modelContainer(for: Book.self)
     }
 }
