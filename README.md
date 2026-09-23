@@ -15,6 +15,10 @@ The Library is backed by local on-device storage. You can add a book, set its re
 
 No accounts, imports, APIs, notifications, or external book data are implemented yet.
 
+## Checks
+
+Run `./scripts/run-evals.sh` before committing. The repository includes a pre-commit hook that runs this build evaluation when Git is configured with `git config core.hooksPath .githooks`.
+
 ## Requirements
 
 - macOS with the current version of Xcode installed
