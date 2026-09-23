@@ -1203,9 +1203,33 @@ Testing should cover:
 
 ---
 
-# 40. Revised Development Milestones
+# 40. Development Milestones
 
-## M1 — App Shell
+## Engineering Principle for Remaining Milestones
+
+Book Buddy should remain **local-first for personal use**.
+
+The user's primary personal data should live locally on the iPhone using SwiftData, including:
+
+- Library
+- Reading status
+- Ratings
+- Reviews
+- Reading dates
+- Following preferences
+- Watchlist
+- Cached book/series metadata
+- Settings
+
+Do **not** introduce a conventional cloud database, user-account system, or full Book Buddy backend unless a later milestone explicitly requires it.
+
+External APIs may be called directly by the app where appropriate for the personal version.
+
+A small cloud-hosted monitoring worker may eventually be introduced solely to discover new releases, release-date changes, and events while the app is not running. This worker should store only the minimum information necessary for monitoring.
+
+---
+
+## M1 — App Shell — COMPLETE
 
 - SwiftUI project
 - Git repository
@@ -1213,9 +1237,11 @@ Testing should cover:
 - Library / Radar / Calendar / Settings navigation
 - Placeholder screens
 
-## M2 — Local Data Model
+---
 
-Build the local foundation:
+## M2 — Local Data Model — COMPLETE
+
+Local SwiftData foundation:
 
 - Book
 - Author
@@ -1226,125 +1252,435 @@ Build the local foundation:
 - Rating
 - Review
 - Reading dates
-- SwiftData persistence
+- Local persistence
 
-Do not introduce backend dependencies yet.
+Future milestones should build on this model rather than replacing it with cloud persistence.
+
+---
 
 ## M3 — Local Library UI
 
-Build a usable local reading tracker:
+Build a usable local reading tracker.
+
+Implement:
 
 - Library list
-- Book detail
-- Mark Want to Read
-- Mark Currently Reading
-- Mark Read
-- Mark DNF
-- Rate book
-- Write/edit review
-- Reading dates
+- Book detail screen
+- Want to Read status
+- Currently Reading status
+- Read status
+- DNF status
+- Rating books
+- Writing/editing reviews
+- Date started
+- Date finished
+- Editing existing reading information
 
-At this point Book Buddy should work as a basic offline reading library.
+All changes should persist locally through SwiftData.
+
+At the end of M3, Book Buddy should function as a basic offline reading tracker.
+
+---
 
 ## M4 — Goodreads Import
 
-- CSV import
-- Field mapping
+Implement Goodreads CSV import.
+
+Support:
+
+- Selecting/importing a Goodreads CSV
+- Parsing Goodreads fields
 - Book creation/matching
+- Authors
+- Reading status
 - Ratings
 - Reviews
-- Reading history
+- Reading dates
 - Duplicate handling
+- Import error handling
+
+Imported data should populate the existing local SwiftData models.
+
+Goodreads should be treated as an import source rather than a required live dependency.
+
+---
 
 ## M5 — Series + Following + Watchlist
 
-- Series model/UI
+Build the core Book Buddy organizational experience.
+
+Implement:
+
+### Series
+
 - Series identification
+- Series detail screen
+- Series book ordering
 - Series progress
-- Follow/unfollow series
-- Follow/unfollow author
-- Follow individual books
-- Persistent Watchlist
-- Watchlist lifecycle
-- Manual removal
-- Mark Read behavior
+- Support for non-linear series where practical
 
-## M6 — Live Search
+### Following
 
-- Search interface
-- External metadata provider abstraction
-- Book search
+Allow users to follow/unfollow:
+
+- Series
+- Authors
+- Individual books
+
+Following represents:
+
+> What should Book Buddy watch for me?
+
+### Watchlist
+
+Implement a persistent book-only Watchlist.
+
+Books can enter because:
+
+- User followed the book directly
+- Book was discovered through a followed series
+- Book was discovered through a followed author
+
+Support:
+
+- Watching
+- Released
+- Read/Complete
+- Removed
+
+A notification must never automatically remove a book from the Watchlist.
+
+Marking a book Read should remove it from the active Watchlist while preserving it in the Library.
+
+Unfollowing a series or author should not unexpectedly delete an existing Watchlist item.
+
+All of this remains local in SwiftData.
+
+---
+
+## M6 — Live Book Search
+
+Allow users to discover books, authors, and series that are not already stored locally.
+
+Implement:
+
+- Add/Search interface
+- Book title search
 - Author search
-- Series search where supported
-- Result deduplication
-- Add/follow from search
+- ISBN search where supported
+- Series discovery where supported
+- Search debouncing
+- Loading states
+- Empty/error states
+- Search result selection
+- Adding a book to Book Buddy
+- Following from search
+- Adding to Watchlist from search
 
-This may initially call an external provider directly during development, but the architecture should make migration to the Book Buddy backend straightforward.
+Create a provider abstraction such as:
+
+`BookMetadataProvider`
+
+so the app is not permanently coupled to one external metadata service.
+
+Potential providers include:
+
+- Hardcover
+- Google Books
+- Open Library
+
+For the personal version, the iPhone may call these APIs directly.
+
+Do not create a Book Buddy cloud search service solely for this milestone.
+
+---
 
 ## M7 — Hardcover Integration
 
-- ReadingDataProvider abstraction
-- Hardcover implementation
-- Authentication
-- Import/synchronization
-- Conflict strategy for external vs. Book Buddy data
+Introduce Hardcover as the preferred ongoing reading-data integration.
 
-Do not implement write-back until conflict behavior is intentionally designed.
+Implement:
 
-## M8 — Backend + Release Tracking
+- `ReadingDataProvider` abstraction
+- `HardcoverProvider`
+- Authentication/API access
+- Reading-history synchronization
+- New-book synchronization
+- Ratings/reviews import where supported
+- Reading-status synchronization
+- Reading-date synchronization
+- Duplicate/matching behavior
+- Sync error handling
 
-Introduce cloud infrastructure:
+Book Buddy's locally created data must remain usable even if Hardcover is unavailable.
 
-- Backend API
-- Database
-- Canonical book metadata
-- Search caching
-- Release ingestion
-- Shared release monitoring
-- User synchronization
+Do not implement automatic two-way write-back until conflict-resolution behavior has been intentionally designed.
 
-## M9 — Notifications + Calendar
+Book Buddy remains local-first.
 
-- Push notifications
-- Release announcement
-- Countdown reminders
-- Release-day notification
-- Calendar integration
-- Idempotency
+---
+
+## M8 — Local Release Tracking
+
+Introduce release information without introducing a Book Buddy cloud backend.
+
+Implement:
+
+- Release model
+- Release date
+- Release status
+- Source
+- Confidence
+- Last checked
+- Previous release date where relevant
+- Release information for followed books
+- Release information for books discovered through followed series/authors
+- Refresh release information when the app is opened or manually refreshed
+- Detect changes between previously known and newly retrieved release information
+- Update Watchlist appropriately
+
+Where practical, use external metadata providers directly from the app.
+
+At the end of M8, Book Buddy should know about upcoming releases while the user is actively using/refeshing the app.
+
+It does **not yet need to discover changes while the app has been closed for long periods.**
+
+---
+
+## M9 — Calendar + Local Notifications
+
+Build the proactive experience around release information Book Buddy already knows.
+
+### Calendar
+
+Implement:
+
+- Month view
+- Agenda/list view
+- Book release dates
+- Book Buddy reminder dates
+- Navigation from calendar items to relevant books/series
+
+### Local notifications
+
+Using known release dates, schedule notifications such as:
+
+- Approximately 3 months before release
+- Approximately 1 month before release
+- Approximately 1 week before release
+- Release day
+
+Notifications should be updated or cancelled when release dates change.
+
+Notification scheduling should be idempotent.
+
+The release-day notification should **not** remove the book from the Watchlist.
+
+This milestone should use iOS local notifications rather than requiring server-generated push notifications.
+
+---
 
 ## M10 — AI Recaps
 
-- Personalized recap generation
-- Reading-boundary enforcement
-- Review/rating context
-- Caching
+Implement personalized:
 
-## M11 — Events
+> What you need to remember
+
+recaps.
+
+Inputs may include:
+
+- Books marked Read
+- Reading order
+- Ratings
+- Reviews
+- Reading dates
+- Series metadata
+
+Requirements:
+
+- Never use unread books as recap material
+- Enforce the user's reading boundary
+- Prioritize important characters, relationships, plot developments, unresolved threads, and relevant world-building
+- Incorporate the user's own ratings/reviews where useful
+- Cache generated recaps locally
+- Avoid unnecessary repeated AI calls
+
+For the personal version, recap generation may call the chosen AI API directly or through the smallest secure mechanism necessary.
+
+Do not build a general Book Buddy backend solely for AI recap generation.
+
+---
+
+## M11 — Local Event Discovery
+
+Introduce author/book events.
+
+Support relevant:
+
+- Author talks
+- Signings
+- Launch parties
+- Bookstore events
+- Library events
+- Festivals
+- Other useful literary events
+
+Events should relate to:
+
+- Followed authors
+- Followed series
+- Watchlist books
+- Upcoming releases
+
+Implement:
 
 - Event model
-- Initial sources
-- Location filtering
-- Event notifications
-- Calendar integration
+- Initial reliable event sources
+- User-configured locations/radii
+- Event deduplication
+- Event display in Radar
+- Event display in Calendar
+- Refresh when Book Buddy is opened or manually refreshed
 
-## M12 — Polish
+At this stage, Book Buddy does not need to discover events while the app is completely inactive.
+
+---
+
+## M12 — Background Monitoring Worker
+
+Only after local release/event functionality is working well, add a **small cloud-hosted monitoring worker**.
+
+This is intentionally **not a full Book Buddy backend**.
+
+Its purpose is to allow Book Buddy to discover important changes even when the iPhone app has not been opened recently.
+
+The worker should:
+
+- Wake on a schedule
+- Know which books, series, and authors need monitoring
+- Check relevant external sources
+- Detect new books
+- Detect release-date changes
+- Detect relevant new events where supported
+- Cache previously known external state
+- Avoid repeatedly checking identical entities separately
+- Send an APNs push when meaningful new information is discovered
+
+Example:
+
+```text
+iPhone
+   │
+   │ monitoring subscriptions
+   ▼
+Book Buddy Monitor
+   │
+   ├── followed books
+   ├── followed series
+   └── followed authors
+   │
+   ▼
+External sources
+   │
+   ▼
+Meaningful change?
+   │
+   └── Yes → APNs → iPhone
+```
+
+### Data minimization
+
+The monitoring worker should store only what it needs.
+
+It should **not** require uploading the user's full:
+
+- Library
+- Ratings
+- Reviews
+- Reading history
+- AI recaps
+
+It may store information such as:
+
+- Anonymous/device identifier
+- APNs device token
+- Entity being monitored
+- External entity identifier
+- Last-known release/event state
+- Last checked timestamp
+
+The user's primary reading data remains on the iPhone.
+
+### Division of notification responsibilities
+
+The monitoring worker should primarily notify the user about information the phone could not already know, such as:
+
+- New book announced
+- Release date discovered
+- Release date changed
+- Relevant event announced
+
+Once the iPhone knows a release date, it should continue using **local notifications** for:
+
+- 3-month reminder
+- 1-month reminder
+- 1-week reminder
+- Release day
+
+This keeps the monitoring service small and inexpensive.
+
+---
+
+## M13 — Polish the Personal Version
+
+Before introducing multi-user cloud architecture, make the personal version excellent.
+
+Focus on:
 
 - Onboarding
 - UI refinement
+- Radar usefulness
+- Search experience
+- Import experience
+- Sync reliability
 - Error handling
 - Performance
-- Settings
 - Accessibility
-- Testing
+- Notification preferences
+- Location settings
+- Monitoring-worker reliability
+- Data backup/export where appropriate
+- Comprehensive testing
 
-## M13 — Friends / Multi-user Expansion
+At the end of M13, Book Buddy should be a polished personal iPhone app.
 
-Only after the personal product works well:
+---
 
-- Full authentication
-- Multi-user refinement
-- Sharing
-- Friend-specific functionality
+## M14 — Friends / Full Cloud Architecture
+
+Only pursue this milestone if Book Buddy is going to expand beyond personal use.
+
+This is when a conventional Book Buddy cloud architecture becomes appropriate.
+
+Potential additions:
+
+- User authentication
+- User accounts
+- Cloud database
+- Cross-device synchronization
+- Canonical shared book metadata
+- Server-side search/cache
+- Centralized monitoring
+- Multi-user notification infrastructure
+- Cloud backup
+- Friend sharing
+- Appropriate privacy/security controls
+- TestFlight/App Store distribution considerations
+
+The architecture should reuse lessons and components from the M12 monitoring worker where appropriate.
+
+Do **not** build this infrastructure merely to support the personal version of Book Buddy.
 
 ---
 
