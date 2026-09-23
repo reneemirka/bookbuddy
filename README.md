@@ -2,7 +2,7 @@
 
 Book Buddy is a personal reading companion for keeping track of your library, anticipated books, author events, and the details you want to remember before the next installment.
 
-## Current milestone: M2 — Local Library
+## Current milestone: M3 — Local Library UI
 
 Book Buddy currently provides a native iOS app shell and four primary tabs:
 
@@ -11,7 +11,7 @@ Book Buddy currently provides a native iOS app shell and four primary tabs:
 - Calendar
 - Settings
 
-The Library is backed by local on-device storage. You can add a book with its title, author, reading status, optional rating, and optional review; tap it to view its detail screen; or swipe left to remove it. The other tabs remain placeholders.
+The Library is backed by local on-device storage. You can add a book, set its reading status, rating, review, and reading dates; tap it to view its detail screen; edit that reading information later; or swipe left to remove it. The other tabs remain placeholders.
 
 No accounts, imports, APIs, notifications, or external book data are implemented yet.
 

@@ -11,6 +11,10 @@ struct AddBookView: View {
     @State private var readingStatus: ReadingStatus = .wantToRead
     @State private var rating = 0
     @State private var review = ""
+    @State private var hasStartedReadingDate = false
+    @State private var startedReadingAt = Date()
+    @State private var hasFinishedReadingDate = false
+    @State private var finishedReadingAt = Date()
 
     var body: some View {
         NavigationStack {
@@ -32,6 +36,16 @@ struct AddBookView: View {
                         ForEach(1...5, id: \.self) { value in
                             Text("\(value) star\(value == 1 ? "" : "s")").tag(value)
                         }
+                    }
+
+                    Toggle("Started reading", isOn: $hasStartedReadingDate)
+                    if hasStartedReadingDate {
+                        DatePicker("Date started", selection: $startedReadingAt, displayedComponents: .date)
+                    }
+
+                    Toggle("Finished reading", isOn: $hasFinishedReadingDate)
+                    if hasFinishedReadingDate {
+                        DatePicker("Date finished", selection: $finishedReadingAt, displayedComponents: .date)
                     }
                 }
 
@@ -64,7 +78,7 @@ struct AddBookView: View {
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             author: author
         )
-        let userBook = UserBook(book: book, readingStatus: readingStatus, rating: rating == 0 ? nil : Double(rating), review: trimmedReview.isEmpty ? nil : trimmedReview)
+        let userBook = UserBook(book: book, readingStatus: readingStatus, rating: rating == 0 ? nil : Double(rating), review: trimmedReview.isEmpty ? nil : trimmedReview, startedReadingAt: hasStartedReadingDate ? startedReadingAt : nil, finishedReadingAt: hasFinishedReadingDate ? finishedReadingAt : nil)
 
         modelContext.insert(book)
         modelContext.insert(userBook)

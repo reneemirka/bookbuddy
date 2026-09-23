@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BookDetailView: View {
     let userBook: UserBook
+    @State private var isPresentingEditor = false
 
     var body: some View {
         List {
@@ -47,5 +48,13 @@ struct BookDetailView: View {
         }
         .navigationTitle("Book Details")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            Button("Edit") {
+                isPresentingEditor = true
+            }
+        }
+        .sheet(isPresented: $isPresentingEditor) {
+            EditReadingView(userBook: userBook)
+        }
     }
 }
