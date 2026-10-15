@@ -1,4 +1,5 @@
 import XCTest
+@testable import BookBuddy
 
 final class GoodreadsCSVTests: XCTestCase {
     func testParsesGoodreadsReadingFieldsAndQuotedReview() throws {
@@ -25,5 +26,23 @@ final class GoodreadsCSVTests: XCTestCase {
 
     func testRejectsFileWithoutRequiredHeaders() {
         XCTAssertThrowsError(try GoodreadsCSV.parse(Data("Name,Value\nA,B\n".utf8)))
+    }
+
+    func testDateFilterSkipsOnlyRecordsWhoseNewestRelevantDatePrecedesCutoff() throws {
+        let csv = "Book Id,Title,Author,Date Read,Date Added\n1,Older,A,2019/12/01,2019/12/02\n2,Recent,A,2019/12/01,2020/01/02\n3,Undated,A,,\n"
+        let cutoff = try XCTUnwrap(GoodreadsCSV.date("2020/01/01"))
+        let filter = GoodreadsImportFilter(earliestActivityDate: cutoff)
+        let preview = try GoodreadsImporter().preview(Data(csv.utf8), filter: filter)
+
+        XCTAssertEqual(preview.eligible, 2)
+        XCTAssertEqual(preview.skipped, 1)
+    }
+
+    func testDateFilterWithoutCutoffIncludesEveryRecord() throws {
+        let csv = "Book Id,Title,Author,Date Read\n1,Older,A,2019/12/01\n2,Undated,A,\n"
+        let preview = try GoodreadsImporter().preview(Data(csv.utf8))
+
+        XCTAssertEqual(preview.eligible, 2)
+        XCTAssertEqual(preview.skipped, 0)
     }
 }

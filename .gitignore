@@ -23,3 +23,10 @@ fastlane/test_output/
 
 # macOS
 .DS_Store
+
+# Cloudflare Worker development secrets and dependencies
+recap-gateway/.dev.vars
+recap-gateway/.env
+recap-gateway/node_modules/
+recap-gateway/.wrangler/
+.pnpm-store/

@@ -69,7 +69,6 @@ struct EditReadingView: View {
         userBook.review = trimmedReview.isEmpty ? nil : trimmedReview
         userBook.startedReadingAt = hasStartedReadingDate ? startedReadingAt : nil
         userBook.finishedReadingAt = hasFinishedReadingDate ? finishedReadingAt : nil
-
         do {
             try modelContext.save()
             dismiss()

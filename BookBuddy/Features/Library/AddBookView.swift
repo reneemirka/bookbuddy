@@ -5,9 +5,13 @@ struct AddBookView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query private var authors: [Author]
+    @Query private var series: [Series]
 
     @State private var title = ""
     @State private var authorName = ""
+    @State private var seriesName = ""
+    @State private var seriesPosition = ""
+    @State private var seriesType = "Novel"
     @State private var readingStatus: ReadingStatus = .wantToRead
     @State private var rating = 0
     @State private var review = ""
@@ -15,6 +19,7 @@ struct AddBookView: View {
     @State private var startedReadingAt = Date()
     @State private var hasFinishedReadingDate = false
     @State private var finishedReadingAt = Date()
+    @State private var saveError: String?
 
     var body: some View {
         NavigationStack {
@@ -22,6 +27,13 @@ struct AddBookView: View {
                 Section("Book") {
                     TextField("Title", text: $title)
                     TextField("Author", text: $authorName)
+                }
+
+                Section("Series (optional)") {
+                    TextField("Series name", text: $seriesName)
+                    TextField("Number", text: $seriesPosition)
+                        .keyboardType(.decimalPad)
+                    TextField("Type (for example, novella)", text: $seriesType)
                 }
 
                 Section("Reading") {
@@ -66,6 +78,11 @@ struct AddBookView: View {
                         .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
+            .alert("Couldn't Save Book", isPresented: Binding(get: { saveError != nil }, set: { if !$0 { saveError = nil } })) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(saveError ?? "")
+            }
         }
     }
 
@@ -82,6 +99,19 @@ struct AddBookView: View {
 
         modelContext.insert(book)
         modelContext.insert(userBook)
-        dismiss()
+        let trimmedSeries = seriesName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSeries.isEmpty {
+            let matchedSeries = series.first { $0.name.compare(trimmedSeries, options: .caseInsensitive) == .orderedSame }
+            let bookSeries = matchedSeries ?? Series(name: trimmedSeries)
+            if bookSeries.modelContext == nil { modelContext.insert(bookSeries) }
+            let position = Double(seriesPosition.trimmingCharacters(in: .whitespacesAndNewlines))
+            modelContext.insert(SeriesBook(series: bookSeries, book: book, position: position, type: seriesType.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Novel" : seriesType.trimmingCharacters(in: .whitespacesAndNewlines)))
+        }
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            saveError = "Book Buddy couldn't save this book. Please try again."
+        }
     }
 }

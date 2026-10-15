@@ -1,0 +1,36 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "bookbuddy-recap-gateway",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-10-01",
+	"kv_namespaces": [
+		{
+			"binding": "RECAP_USAGE",
+			"id": "5bb83bb32eff4a7aac47abe60da6499a"
+		},
+		{
+			"binding": "MONITOR_SUBSCRIPTIONS",
+			"id": "c1e86033cbc94903b306a5bd1211b599"
+		},
+		{
+			"binding": "MONITOR_STATE",
+			"id": "e30b692fe471406dabd6ad00530f87b3"
+		}
+	],
+	"triggers": {
+		"crons": ["0 */6 * * *"]
+	},
+	"secrets": {
+		"required": [
+			"OPENAI_API_KEY",
+			"CLIENT_TOKEN"
+		]
+	},
+	"vars": {
+		"OPENAI_MODEL": "gpt-6-luna",
+		"MAX_RECAPS_PER_DAY": "20",
+		"MAX_RECAPS_PER_MONTH": "100",
+		"MAX_INPUT_CHARACTERS": "20000",
+		"MAX_OUTPUT_TOKENS": "6600"
+	}
+}

@@ -85,26 +85,11 @@ Following answers:
 
 > **What should Book Buddy watch for me?**
 
-## Watchlist
+## Reading Queue and Radar
 
-The Watchlist is a book-only actionable queue containing books the user is waiting for or intends to read.
+**Want to Read** is the user's book-only reading queue. It is a reading status on a `UserBook`, not a separate list.
 
-A book may enter because:
-
-- The user followed it directly
-- It was discovered through a followed series
-- It was discovered through a followed author
-
-Watchlist answers:
-
-> **What books am I waiting for or need to read?**
-
-A Watchlist item remains active until the user:
-
-- Marks the book Read/Complete, or
-- Removes it
-
-Sending a notification never removes a Watchlist item.
+**Radar** is the proactive release-update feed. It shows only a followed book, series, or author when Book Buddy knows about a relevant upcoming or newly released book. A reader can dismiss an individual Radar item without unfollowing its source; an item also stops appearing when its book is marked Read.
 
 ---
 
@@ -127,7 +112,6 @@ The planned product should support:
 - Follow/unfollow series
 - Follow/unfollow books
 - Follow/unfollow authors
-- Persistent Watchlist
 - Upcoming release tracking
 - Calendar
 - Release notifications
@@ -205,7 +189,6 @@ The user can select a result and:
 
 - Add it to their Library
 - Follow the book
-- Add it to the Watchlist
 - Navigate to its author
 - Navigate to its series
 
@@ -308,7 +291,6 @@ Examples:
 
 - Library
 - UserBook records
-- Watchlist
 - Ratings
 - Reviews
 - Reading status
@@ -342,7 +324,6 @@ It should contain:
 - FollowedSeries
 - FollowedAuthor
 - FollowedBook
-- WatchlistItem
 - Notification preferences
 - Locations
 - Notification history
@@ -570,7 +551,7 @@ Users should be able to discover a series through:
 
 Following a series tells Book Buddy to monitor it for future books and relevant events.
 
-Newly discovered upcoming books may enter the Watchlist.
+Newly discovered upcoming books can appear on Radar for readers who follow the series.
 
 ---
 
@@ -585,7 +566,7 @@ This is useful for:
 - Upcoming books
 - Books discovered outside the user's existing Library
 
-Following the book places it on the Watchlist and enables relevant monitoring.
+Following the book enables relevant monitoring; it does not add the book to the reading queue.
 
 ---
 
@@ -603,73 +584,18 @@ Book Buddy may monitor followed authors for:
 - Launch events
 - Other relevant appearances
 
-Relevant upcoming books may be added to the Watchlist.
+Relevant upcoming books can appear on Radar.
 
 ---
 
-# 23. Watchlist
+# 23. Radar Lifecycle
 
-The Watchlist is the user's persistent actionable list of books they are waiting for or intend to read.
+Radar is a filtered release feed, not a second reading queue. It can show:
 
-Example:
+- An upcoming book related to something the reader follows
+- A newly released, unread book related to something the reader follows
 
-## Coming Soon
-
-**Murderbot #8**  
-May 14, 2027  
-Because you follow Murderbot
-
-**New Emily Henry Novel**  
-June 2027  
-Because you follow Emily Henry
-
-## Released
-
-**Book X**  
-Released September 18  
-Not yet read
-
-A book remains on the active Watchlist until the user:
-
-- Marks it read/complete, or
-- Removes it
-
----
-
-# 24. Watchlist Lifecycle
-
-States may include:
-
-- Watching
-- Released
-- Read/Complete
-- Removed
-
-The active Watchlist should prioritize:
-
-1. Upcoming books
-2. Released-but-unread books
-
-Read books move into the Library/history.
-
----
-
-# 25. Following and Watchlist Independence
-
-Following determines what Book Buddy monitors.
-
-Watchlist represents books the user is waiting for.
-
-Example:
-
-1. User follows Series A.
-2. Book Buddy discovers Book 4.
-3. Book 4 enters Watchlist.
-4. User later unfollows Series A.
-5. Book 4 remains on Watchlist.
-6. User can remove Book 4 separately if they no longer want it.
-
-This prevents Watchlist items from unexpectedly disappearing.
+A Radar item disappears when the reader marks its book Read, dismisses that item, or unfollows the source that made it relevant. Dismissing an item does not change the reader's following preferences or Library history.
 
 ---
 
@@ -702,7 +628,6 @@ Book Buddy should monitor releases relevant to:
 
 - Followed series
 - Followed books
-- Watchlist books
 
 Potential sources include:
 
@@ -781,7 +706,7 @@ Notify:
 
 > **It's out!**
 
-The book remains on the Watchlist afterward.
+The release item remains on Radar until the reader reads or dismisses it, unless its source is unfollowed.
 
 ---
 
@@ -862,7 +787,6 @@ Events may be relevant because of:
 
 - Followed author
 - Followed series
-- Watchlist book
 - Upcoming release
 
 Initial event coverage can use a limited set of reliable sources.
@@ -955,16 +879,6 @@ Conceptual entities include:
 - followedAt
 - notificationsEnabled
 
-### WatchlistItem
-
-- userId
-- bookId
-- addedAt
-- addedReason
-- status
-- completedAt
-- removedAt
-
 ### Release
 
 - id
@@ -1026,7 +940,6 @@ Reading history and personal book data.
 
 The proactive Book Buddy dashboard containing:
 
-- Watchlist
 - New announcements
 - Upcoming releases
 - Recently released-but-unread books
@@ -1087,7 +1000,7 @@ Locally available functionality should include, where cached:
 - Library browsing
 - Ratings/reviews
 - Reading status
-- Watchlist browsing
+- Radar browsing
 - Series progress
 
 Changes made offline should eventually synchronize once connectivity returns after cloud synchronization is implemented.
@@ -1158,15 +1071,12 @@ Testing should cover:
 - Follow/unfollow author
 - Unfollowing preserves history
 
-### Watchlist
+### Radar
 
-- Direct book addition
-- Series-generated item
-- Author-generated item
-- Notification does not remove item
-- Released book remains active
-- Mark Read removes from active Watchlist
-- Remove works without deleting Library history
+- Upcoming and newly released followed books appear
+- Dismissal removes only the individual Radar item
+- Mark Read removes the item's book from Radar
+- Unfollowing removes items made relevant only by that follow
 
 ### Releases
 
@@ -1217,7 +1127,6 @@ The user's primary personal data should live locally on the iPhone using SwiftDa
 - Reviews
 - Reading dates
 - Following preferences
-- Watchlist
 - Cached book/series metadata
 - Settings
 
@@ -1305,7 +1214,7 @@ Goodreads should be treated as an import source rather than a required live depe
 
 ---
 
-## M5 — Series + Following + Watchlist
+## M5 — Series + Following
 
 Build the core Book Buddy organizational experience.
 
@@ -1331,30 +1240,7 @@ Following represents:
 
 > What should Book Buddy watch for me?
 
-### Watchlist
-
-Implement a persistent book-only Watchlist.
-
-Books can enter because:
-
-- User followed the book directly
-- Book was discovered through a followed series
-- Book was discovered through a followed author
-
-Support:
-
-- Watching
-- Released
-- Read/Complete
-- Removed
-
-A notification must never automatically remove a book from the Watchlist.
-
-Marking a book Read should remove it from the active Watchlist while preserving it in the Library.
-
-Unfollowing a series or author should not unexpectedly delete an existing Watchlist item.
-
-All of this remains local in SwiftData.
+When a reader follows a book that has known series metadata, present a choice between following that book and following its entire series. Following is release monitoring only; it must not add the book to the Library or change its reading status.
 
 ---
 
@@ -1375,7 +1261,6 @@ Implement:
 - Search result selection
 - Adding a book to Book Buddy
 - Following from search
-- Adding to Watchlist from search
 
 Create a provider abstraction such as:
 
@@ -1416,6 +1301,8 @@ Book Buddy's locally created data must remain usable even if Hardcover is unavai
 
 Do not implement automatic two-way write-back until conflict-resolution behavior has been intentionally designed.
 
+For the personal version, the Hardcover token must be kept in iOS secure credential storage. Sync is manual and one-way: records previously imported from Hardcover may refresh from Hardcover, while a matching Book Buddy-created record is preserved rather than overwritten or duplicated.
+
 Book Buddy remains local-first.
 
 ---
@@ -1437,7 +1324,7 @@ Implement:
 - Release information for books discovered through followed series/authors
 - Refresh release information when the app is opened or manually refreshed
 - Detect changes between previously known and newly retrieved release information
-- Update Watchlist appropriately
+- Update Radar appropriately
 
 Where practical, use external metadata providers directly from the app.
 
@@ -1474,7 +1361,7 @@ Notifications should be updated or cancelled when release dates change.
 
 Notification scheduling should be idempotent.
 
-The release-day notification should **not** remove the book from the Watchlist.
+The release-day notification should not remove the related Radar item.
 
 This milestone should use iOS local notifications rather than requiring server-generated push notifications.
 
@@ -1530,7 +1417,6 @@ Events should relate to:
 
 - Followed authors
 - Followed series
-- Watchlist books
 - Upcoming releases
 
 Implement:
@@ -1630,6 +1516,16 @@ Once the iPhone knows a release date, it should continue using **local notificat
 
 This keeps the monitoring service small and inexpensive.
 
+### Deferred deployment note
+
+APNs-backed background monitoring remains a planned capability, but its Apple
+Developer credential setup is deliberately deferred. Before enabling remote
+push notifications, create an APNs authentication key and configure the
+Worker's `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, and
+`APNS_PRIVATE_KEY` secrets. This work is not required by recap functionality;
+the recap deployment should be separated from monitoring configuration before
+it is deployed without APNs.
+
 ---
 
 ## M13 — Polish the Personal Version
@@ -1684,7 +1580,66 @@ Do **not** build this infrastructure merely to support the personal version of B
 
 ---
 
-# 41. First Meaningful Release
+# 41. Next-Session Personal-Version Refinement Backlog
+
+These are requested refinements for the next fresh development session. They are
+not authorization to broaden the current milestone without selecting a focused
+scope first.
+
+## Visual Identity
+
+- Create an app icon and prominent in-app brand mark featuring a black dog with
+  the warm, friendly appearance of a golden retriever, alongside books.
+- The asset should work at iOS app-icon sizes as well as in an in-app welcome or
+  empty state. Confirm the final illustration style before generating it.
+
+## Events Discovery Experience
+
+- Clarify and redesign how events reach the reader. The current local approach
+  permits a reader to add public iCalendar sources manually, but readers should
+  not have to understand or hunt for calendar-feed URLs as the primary workflow.
+- Decide the initial default discovery strategy (for example, a curated set of
+  reliable bookstore/library/festival sources filtered by saved locations), what
+  remains optional advanced configuration, and how source attribution is shown.
+- Preserve the reader's ability to add or disable a specific source. Clearly
+  explain in Settings whether events are coming from built-in sources, optional
+  sources the reader added, or both.
+
+## Goodreads Import Controls
+
+- Before importing a Goodreads CSV, allow the reader to choose a date/timeframe
+  filter. For example, they can exclude books with relevant reading or added
+  dates before January 1, 2020.
+- Make the filter's date field and behavior explicit, show the number of records
+  that will be skipped, and preserve existing duplicate handling and import
+  error reporting.
+
+## Series and Library Behavior
+
+- When a reader adds a book with known series metadata to their Library, ensure
+  the canonical Series and available series membership/order are saved locally;
+  this must not automatically follow the series.
+- A series detail view should show every known book in that series, in its
+  defined order, and show each book's personal Library status (not in Library,
+  Want to Read, Currently Reading, Read, or DNF) alongside relevant rating/date
+  information where available.
+- When adding a book to the Library, present the reader's editable reading
+  fields on that flow: status, rating, review, started date, and finished date.
+  Adding remains local-first and must not require an external service.
+
+## Library Browsing and Book Covers
+
+- Add practical filtering and sorting to the Library. At minimum support
+  reading status, series membership, recently added, and reading/finished date.
+  Keep selections understandable, composable where practical, and persistent
+  for the current session or reader preference.
+- Show a book-cover thumbnail in Library rows when cover metadata is available.
+  Use a polished placeholder when it is unavailable and avoid blocking Library
+  rendering on a network request.
+
+---
+
+# 42. First Meaningful Release
 
 The first meaningful personal version should allow the user to:
 
@@ -1696,9 +1651,8 @@ The first meaningful personal version should allow the user to:
 6. Write/edit reviews.
 7. Follow/unfollow series.
 8. Follow books and authors.
-9. Maintain a persistent Watchlist.
-10. Search for books not already in the Library.
-11. Add those books to Book Buddy.
+9. Search for books not already in the Library.
+10. Add those books to Book Buddy.
 
 This version does **not** require:
 
@@ -1712,7 +1666,7 @@ Those capabilities should be layered onto a useful core product.
 
 ---
 
-# 42. Ultimate Success Criterion
+# 43. Ultimate Success Criterion
 
 Book Buddy should make the user feel:
 
