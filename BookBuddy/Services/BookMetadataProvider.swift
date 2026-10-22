@@ -12,6 +12,64 @@ struct BookSearchResult: Identifiable, Hashable {
     let coverID: Int?
 }
 
+/// Open Library's broad search is useful for discovery, but its raw ranking can
+/// place near matches ahead of the title the reader actually typed. Re-rank on
+/// device so an exact title is always the first result while retaining author,
+/// series, and ISBN searches.
+enum BookSearchRanking {
+    static func ordered(_ results: [BookSearchResult], for query: String) -> [BookSearchResult] {
+        let normalizedQuery = normalized(query)
+        let queryTerms = terms(query)
+        guard !normalizedQuery.isEmpty else { return results }
+
+        return results.enumerated().sorted { left, right in
+            let leftScore = score(left.element, normalizedQuery: normalizedQuery, queryTerms: queryTerms)
+            let rightScore = score(right.element, normalizedQuery: normalizedQuery, queryTerms: queryTerms)
+            if leftScore != rightScore { return leftScore > rightScore }
+
+            let titleOrder = left.element.title.localizedCaseInsensitiveCompare(right.element.title)
+            if titleOrder != .orderedSame { return titleOrder == .orderedAscending }
+            return left.offset < right.offset
+        }.map(\.element)
+    }
+
+    private static func score(_ result: BookSearchResult, normalizedQuery: String, queryTerms: [String]) -> Int {
+        let title = normalized(result.title)
+        let author = normalized(result.authorName ?? "")
+        let series = normalized(result.seriesName ?? "")
+
+        if title == normalizedQuery { return 10_000 }
+        if title.hasPrefix(normalizedQuery) { return 8_000 - min(title.count - normalizedQuery.count, 500) }
+        if title.contains(normalizedQuery) { return 7_000 - min(title.count - normalizedQuery.count, 500) }
+        if result.isbn?.filter(\.isNumber) == normalizedQuery { return 10_000 }
+
+        let matchedTitleTerms = queryTerms.filter { title.contains($0) }.count
+        let matchedAuthorTerms = queryTerms.filter { author.contains($0) }.count
+        let matchedSeriesTerms = queryTerms.filter { series.contains($0) }.count
+        let allTitleTermsMatch = !queryTerms.isEmpty && matchedTitleTerms == queryTerms.count
+
+        var value = matchedTitleTerms * 1_000 + matchedAuthorTerms * 350 + matchedSeriesTerms * 300
+        if allTitleTermsMatch { value += 4_000 }
+        value -= min(abs(title.count - normalizedQuery.count), 300)
+        return value
+    }
+
+    private static func normalized(_ value: String) -> String {
+        value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .unicodeScalars
+            .filter { CharacterSet.alphanumerics.contains($0) }
+            .map(String.init)
+            .joined()
+    }
+
+    private static func terms(_ value: String) -> [String] {
+        value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .map { $0.lowercased() }
+    }
+}
+
 protocol BookMetadataProvider {
     func search(query: String) async throws -> [BookSearchResult]
 }

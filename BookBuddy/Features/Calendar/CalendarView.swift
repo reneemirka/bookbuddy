@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+@preconcurrency import CoreLocation
 
 struct CalendarView: View {
     private enum DisplayMode: String, CaseIterable, Identifiable {
@@ -230,7 +231,7 @@ private struct EventDetailView: View {
     }
 }
 
-private struct ReleaseDetailView: View {
+struct ReleaseDetailView: View {
     let release: Release
 
     var body: some View {
@@ -246,6 +247,13 @@ private struct ReleaseDetailView: View {
                     NavigationLink("Open Book Details") { BookDetailView(userBook: userBook) }
                 }
             }
+            if let book = release.book {
+                Section("Find It Locally") {
+                    NavigationLink("Search Nearby Bookstores") {
+                        LocalBookstoreFinderView(book: book)
+                    }
+                }
+            }
             let series = release.book?.seriesMemberships.compactMap(\.series) ?? []
             if !series.isEmpty {
                 Section("Series") {
@@ -257,5 +265,185 @@ private struct ReleaseDetailView: View {
         }
         .navigationTitle("Release")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct LocalBookstoreFinderView: View {
+    let book: Book
+    @State private var location = ""
+    @State private var isLocating = false
+    @State private var isSearching = false
+    @State private var results: [LocalBookstoreSearchResult] = []
+    @State private var errorMessage: String?
+    @State private var didSearch = false
+
+    var body: some View {
+        List {
+            Section {
+                Text(book.title).font(.title3.weight(.semibold))
+                if let author = book.author?.name { Text(author).foregroundStyle(.secondary) }
+                if let isbn = book.isbn, !isbn.isEmpty { Text("ISBN \(isbn)").font(.caption).foregroundStyle(.secondary) }
+            }
+
+            Section("Search Area") {
+                TextField("City or area", text: $location)
+                    .textInputAutocapitalization(.words)
+                Button {
+                    useCurrentLocation()
+                } label: {
+                    if isLocating { Label("Finding Your City…", systemImage: "location") }
+                    else { Label("Use Current Location", systemImage: "location") }
+                }
+                .disabled(isLocating || isSearching)
+                Text("Only your city or area—not your precise location—is sent to the search service.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Button {
+                    search()
+                } label: {
+                    if isSearching { Label("Checking Bookstore Sites…", systemImage: "magnifyingglass") }
+                    else { Label("Find It Locally", systemImage: "books.vertical") }
+                }
+                .disabled(location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSearching || isLocating)
+            }
+
+            if !results.isEmpty {
+                Section("Nearby Bookstores") {
+                    ForEach(results) { result in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(result.name).font(.headline)
+                                Spacer()
+                                Text(result.availability.title)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(result.availability == .listedAvailable ? .green : .orange)
+                            }
+                            Text(result.detail).font(.subheadline).foregroundStyle(.secondary)
+                            Link("Open Store Listing", destination: result.sourceURL)
+                        }
+                        .padding(.vertical, 3)
+                    }
+                }
+            } else if didSearch, !isSearching {
+                ContentUnavailableView("No Online Listings Found", systemImage: "book.closed", description: Text("Try another nearby city, or call a favorite local bookstore—they may have stock that is not listed online."))
+            }
+        }
+        .navigationTitle("Find It Locally")
+        .navigationBarTitleDisplayMode(.inline)
+        .alert("Couldn’t Search Local Bookstores", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    private func useCurrentLocation() {
+        isLocating = true
+        Task {
+            defer { isLocating = false }
+            do {
+                let localityService = CurrentLocalityService()
+                location = try await localityService.locality()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func search() {
+        isSearching = true
+        errorMessage = nil
+        didSearch = false
+        results = []
+        Task {
+            defer { isSearching = false }
+            do {
+                guard let configuration = try RecapGatewayCredentialsStore.shared.configuration() else {
+                    throw LocalBookstoreSearchError.notConfigured
+                }
+                results = try await LocalBookstoreGatewayProvider(configuration: configuration).search(for: book, near: location)
+                didSearch = true
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+}
+
+private final class CurrentLocalityService: NSObject, CLLocationManagerDelegate {
+    private let manager = CLLocationManager()
+    private var authorizationContinuation: CheckedContinuation<Void, Error>?
+    private var locationContinuation: CheckedContinuation<CLLocation, Error>?
+
+    override init() {
+        super.init()
+        manager.delegate = self
+    }
+
+    func locality() async throws -> String {
+        if manager.authorizationStatus == .notDetermined {
+            try await requestAuthorization()
+        }
+        guard manager.authorizationStatus == .authorizedWhenInUse || manager.authorizationStatus == .authorizedAlways else {
+            throw CurrentLocalityError.permissionDenied
+        }
+        let location = try await requestLocation()
+        let placemark = try await CLGeocoder().reverseGeocodeLocation(location).first
+        let parts = [placemark?.locality, placemark?.administrativeArea, placemark?.country]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard !parts.isEmpty else { throw CurrentLocalityError.unavailable }
+        return parts.joined(separator: ", ")
+    }
+
+    private func requestAuthorization() async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            authorizationContinuation = continuation
+            manager.requestWhenInUseAuthorization()
+        }
+    }
+
+    private func requestLocation() async throws -> CLLocation {
+        try await withCheckedThrowingContinuation { continuation in
+            locationContinuation = continuation
+            manager.requestLocation()
+        }
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        guard let continuation = authorizationContinuation, manager.authorizationStatus != .notDetermined else { return }
+        authorizationContinuation = nil
+        if manager.authorizationStatus == .authorizedWhenInUse || manager.authorizationStatus == .authorizedAlways {
+            continuation.resume()
+        } else {
+            continuation.resume(throwing: CurrentLocalityError.permissionDenied)
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let continuation = locationContinuation else { return }
+        locationContinuation = nil
+        if let location = locations.last { continuation.resume(returning: location) }
+        else { continuation.resume(throwing: CurrentLocalityError.unavailable) }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        locationContinuation?.resume(throwing: error)
+        locationContinuation = nil
+    }
+}
+
+private enum CurrentLocalityError: LocalizedError {
+    case permissionDenied
+    case unavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .permissionDenied: "Allow location access to use your current city, or enter a city manually."
+        case .unavailable: "Book Buddy could not determine your city. Enter one manually instead."
+        }
     }
 }

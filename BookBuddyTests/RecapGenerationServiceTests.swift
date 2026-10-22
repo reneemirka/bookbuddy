@@ -53,6 +53,18 @@ final class RecapGenerationServiceTests: XCTestCase {
         XCTAssertThrowsError(try RecapGatewayConfiguration(endpointString: "https://example.com", token: "token"))
     }
 
+    func testLocalBookstoreSearchUsesTheConnectedGateway() throws {
+        let configuration = try RecapGatewayConfiguration(
+            endpointString: "https://bookbuddy-recap-gateway.example.workers.dev/v1/recaps",
+            token: "token"
+        )
+
+        XCTAssertEqual(
+            LocalBookstoreGatewayProvider.endpoint(for: configuration).absoluteString,
+            "https://bookbuddy-recap-gateway.example.workers.dev/v1/local-bookstores"
+        )
+    }
+
     @MainActor
     func testBookSummaryRequiresReadBook() throws {
         let context = try makeContext()

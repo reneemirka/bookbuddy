@@ -7,6 +7,7 @@ struct RadarView: View {
     @Query private var events: [LiteraryEvent]
     @State private var isRefreshing = false
     @State private var errorMessage: String?
+    @State private var refreshMessage: String?
 
     private var radarReleases: [Release] {
         let recentlyReleased = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .distantPast
@@ -57,12 +58,13 @@ struct RadarView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button { refresh() } label: {
-                        if isRefreshing { ProgressView() } else { Label("Refresh Releases", systemImage: "arrow.clockwise") }
+                        if isRefreshing { ProgressView() } else { Label("Check for Updates", systemImage: "arrow.clockwise") }
                     }
                     .disabled(isRefreshing)
                 }
             }
             .alert("Couldn’t Refresh Releases", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) { Button("OK", role: .cancel) { } } message: { Text(errorMessage ?? "") }
+            .alert("Update Check Complete", isPresented: Binding(get: { refreshMessage != nil }, set: { if !$0 { refreshMessage = nil } })) { Button("OK", role: .cancel) { } } message: { Text(refreshMessage ?? "") }
         }
     }
 
@@ -74,7 +76,17 @@ struct RadarView: View {
                 _ = try await SeriesAnnouncementService.refresh(context: modelContext)
                 _ = try await ReleaseTrackingService.refresh(provider: OpenLibraryReleaseProvider(), context: modelContext)
                 _ = try await EventDiscoveryService.refreshConfiguredSources(context: modelContext)
+                let discoveries: Int
+                if (try MonitoringGatewayCredentialsStore.shared.configuration()) != nil {
+                    try await MonitoringSubscriptionService.sync(context: modelContext)
+                    discoveries = try await MonitoringSubscriptionService.refreshDiscoveries(context: modelContext)
+                } else {
+                    discoveries = 0
+                }
                 await ReleaseNotificationService.rescheduleAll(context: modelContext)
+                refreshMessage = discoveries == 0
+                    ? "Checked your followed books, series, and authors. No new releases were found."
+                    : "Added \(discoveries) new followed release\(discoveries == 1 ? "" : "s") to Radar and Calendar."
             }
             catch { errorMessage = error.localizedDescription }
         }

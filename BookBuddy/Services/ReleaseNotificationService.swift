@@ -11,14 +11,12 @@ enum ReleaseNotificationPreferences {
 }
 
 enum ReleaseReminderKind: String, CaseIterable {
-    case threeMonths
     case oneMonth
     case oneWeek
     case releaseDay
 
     var title: String {
         switch self {
-        case .threeMonths: "About three months away"
         case .oneMonth: "About one month away"
         case .oneWeek: "One week away"
         case .releaseDay: "Out today"
@@ -38,7 +36,6 @@ enum ReleaseReminderSchedule {
         let base = calendar.dateComponents([.year, .month, .day], from: releaseDate)
         guard let releaseDay = calendar.date(from: base) else { return [] }
         let candidates: [(ReleaseReminderKind, Date?)] = [
-            (.threeMonths, calendar.date(byAdding: .month, value: -3, to: releaseDay)),
             (.oneMonth, calendar.date(byAdding: .month, value: -1, to: releaseDay)),
             (.oneWeek, calendar.date(byAdding: .day, value: -7, to: releaseDay)),
             (.releaseDay, releaseDay)
@@ -55,6 +52,7 @@ enum ReleaseReminderSchedule {
 
     static func allIdentifiers(for release: Release) -> [String] {
         ReleaseReminderKind.allCases.map { identifier(for: release, kind: $0) }
+            + ["release.\(release.id.uuidString).threeMonths"]
     }
 }
 
@@ -94,13 +92,43 @@ enum ReleaseNotificationService {
         center.removePendingNotificationRequests(withIdentifiers: ReleaseReminderSchedule.allIdentifiers(for: release))
     }
 
-    private static func notificationBody(for release: Release, kind: ReleaseReminderKind) -> String {
-        let title = release.book?.title ?? "A followed book"
+    static func notificationBody(for release: Release, kind: ReleaseReminderKind) -> String {
+        let description = releaseDescription(for: release)
         return switch kind {
-        case .threeMonths: "\(title) is expected in about three months."
-        case .oneMonth: "\(title) is expected in about one month."
-        case .oneWeek: "\(title) is expected next week."
-        case .releaseDay: "\(title) is out today."
+        case .oneMonth:
+            "\(description) is expected in about one month.\(seriesRatingMessage(for: release))"
+        case .oneWeek:
+            "\(description) releases next week. Open Book Buddy for a spoiler-safe recap of what you need to remember."
+        case .releaseDay:
+            "\(description) is out today. Open Book Buddy to find it locally."
         }
+    }
+
+    private static func releaseDescription(for release: Release) -> String {
+        guard let book = release.book else { return "A followed book" }
+        let series = book.seriesMemberships.compactMap(\.series).first
+        let author = book.author?.name
+
+        var description = book.title
+        if let series { description += " from \(series.name)" }
+        if let author, !author.isEmpty { description += " by \(author)" }
+        return description
+    }
+
+    private static func seriesRatingMessage(for release: Release) -> String {
+        guard let book = release.book,
+              let series = book.seriesMemberships.compactMap(\.series).first
+        else { return "" }
+
+        let ratings = series.books
+            .compactMap(\.book)
+            .filter { $0.id != book.id }
+            .flatMap(\.userBooks)
+            .filter { $0.readingStatus == .read }
+            .compactMap(\.rating)
+        guard !ratings.isEmpty else { return "" }
+
+        let average = ratings.reduce(0, +) / Double(ratings.count)
+        return " You rated this series \(average.formatted(.number.precision(.fractionLength(1))))★ on average."
     }
 }

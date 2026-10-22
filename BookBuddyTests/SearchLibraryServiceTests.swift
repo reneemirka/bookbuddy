@@ -35,6 +35,16 @@ final class SearchLibraryServiceTests: XCTestCase {
         XCTAssertEqual(OpenLibraryMetadataProvider().seriesName(from: ["Fantasy", "Serie:The_Empyrean"]), "The Empyrean")
     }
 
+    func testSearchRanksAnExactTitleAheadOfNearMatches() {
+        let results = [
+            BookSearchResult(id: "1", title: "Grim Tides", subtitle: nil, authorName: "T A Pratt", isbn: nil, seriesName: nil, firstPublishedYear: 2012, coverID: nil),
+            BookSearchResult(id: "2", title: "Grim Tidings", subtitle: nil, authorName: "Caitlin Kittredge", isbn: nil, seriesName: nil, firstPublishedYear: 2016, coverID: nil),
+            BookSearchResult(id: "3", title: "Grim Tidings (Wolves of Lise, Book 2)", subtitle: nil, authorName: "Nancy K. Wallace", isbn: nil, seriesName: nil, firstPublishedYear: 2016, coverID: nil)
+        ]
+
+        XCTAssertEqual(BookSearchRanking.ordered(results, for: "Grim tidings").map(\.id), ["2", "3", "1"])
+    }
+
     func testExtractsOpenLibraryDescriptionFromTextOrValueObject() throws {
         let provider = OpenLibraryMetadataProvider()
 

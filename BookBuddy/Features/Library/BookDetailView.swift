@@ -48,6 +48,9 @@ struct BookDetailView: View {
                         if let previousReleaseDate = release.previousReleaseDate {
                             LabeledContent("Previous Date") { Text(previousReleaseDate, format: .dateTime.month().day().year()) }
                         }
+                        NavigationLink("Find It Locally") {
+                            LocalBookstoreFinderView(book: book)
+                        }
                     }
                 }
 

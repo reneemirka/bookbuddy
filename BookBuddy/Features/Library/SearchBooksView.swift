@@ -57,7 +57,7 @@ struct SearchBooksView: View {
                 try Task.checkCancellation()
                 let searchResults = try await provider.search(query: query)
                 try Task.checkCancellation()
-                results = merge(local: localResults, remote: searchResults)
+                results = BookSearchRanking.ordered(merge(local: localResults, remote: searchResults), for: query)
                 isLoading = false
             } catch is CancellationError {
                 // A newer query superseded this search.

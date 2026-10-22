@@ -8,6 +8,8 @@ interface Env extends MonitorEnv {
   MAX_RECAPS_PER_MONTH: string;
   MAX_INPUT_CHARACTERS: string;
   MAX_OUTPUT_TOKENS: string;
+  MAX_BOOKSTORE_SEARCHES_PER_DAY: string;
+  MAX_BOOKSTORE_SEARCHES_PER_MONTH: string;
   RECAP_USAGE: KVNamespace;
 }
 
@@ -31,6 +33,24 @@ interface Usage {
   dayCount: number;
   month: string;
   monthCount: number;
+}
+
+interface LocalBookstoreSearchRequest {
+  title: string;
+  author?: string | null;
+  isbn?: string | null;
+  location: string;
+}
+
+interface LocalBookstoreResult {
+  name: string;
+  availability: "listed_available" | "check_with_store";
+  detail: string;
+  sourceURL: string;
+}
+
+interface LocalBookstoreResponse {
+  stores: LocalBookstoreResult[];
 }
 
 interface OpenAIResponse {
@@ -58,6 +78,10 @@ const USAGE_KEY = "personal-recap-usage";
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const path = new URL(request.url).pathname;
+    if (path === "/v1/local-bookstores" && request.method === "POST") {
+      if (!authorized(request, env.CLIENT_TOKEN)) return json({ error: "Unauthorized" }, 401);
+      return findLocalBookstores(request, env);
+    }
     if (path === "/v1/monitor/subscriptions" && request.method === "PUT") {
       if (!authorized(request, env.CLIENT_TOKEN)) return json({ error: "Unauthorized" }, 401);
       return saveSubscription(request, env);
@@ -142,6 +166,48 @@ export default {
   async scheduled(_: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> { ctx.waitUntil(runMonitor(env)); }
 };
 
+async function findLocalBookstores(request: Request, env: Env): Promise<Response> {
+  let payload: unknown;
+  try {
+    payload = await request.json();
+  } catch {
+    return json({ error: "Request body must be JSON." }, 400);
+  }
+  const search = validateLocalBookstoreRequest(payload);
+  if (search instanceof Response) return search;
+
+  const quota = await checkQuota(
+    env,
+    integer(env.MAX_BOOKSTORE_SEARCHES_PER_DAY, 6),
+    integer(env.MAX_BOOKSTORE_SEARCHES_PER_MONTH, 24),
+    "personal-local-bookstore-usage"
+  );
+  if (quota instanceof Response) return quota;
+
+  let response: Response;
+  try {
+    response = await requestLocalBookstores(env, search);
+  } catch {
+    console.error("OpenAI bookstore request could not reach the provider");
+    return json({ error: "Local bookstore search is temporarily unavailable.", code: "provider_network_error" }, 502);
+  }
+  if (!response.ok) {
+    console.error("OpenAI bookstore request failed", response.status);
+    if (response.status === 429) {
+      return json({ error: "Local bookstore search is temporarily busy. Please try again in a minute.", code: "provider_rate_limited" }, 429);
+    }
+    return json({ error: "Local bookstore search is temporarily unavailable.", code: `openai_${response.status}` }, 502);
+  }
+
+  const result = await response.json() as OpenAIResponse;
+  const stores = localBookstoreResults(result);
+  if (stores === null) {
+    return json({ error: "Local bookstore search returned an unexpected response.", code: "invalid_bookstore_response" }, 502);
+  }
+  await recordQuota(env, quota, "personal-local-bookstore-usage");
+  return json({ stores });
+}
+
 function requestOpenAI(
   env: Env,
   recapRequest: RecapRequest,
@@ -213,11 +279,11 @@ function validate(payload: unknown, maximumCharacters: number): RecapRequest | R
   return request;
 }
 
-async function checkQuota(env: Env, dailyLimit: number, monthlyLimit: number): Promise<Usage | Response> {
+async function checkQuota(env: Env, dailyLimit: number, monthlyLimit: number, key = USAGE_KEY): Promise<Usage | Response> {
   const now = new Date();
   const day = now.toISOString().slice(0, 10);
   const month = day.slice(0, 7);
-  const existing = await env.RECAP_USAGE.get<Usage>(USAGE_KEY, "json");
+  const existing = await env.RECAP_USAGE.get<Usage>(key, "json");
   const usage: Usage = existing ?? { day, dayCount: 0, month, monthCount: 0 };
   if (usage.day !== day) { usage.day = day; usage.dayCount = 0; }
   if (usage.month !== month) { usage.month = month; usage.monthCount = 0; }
@@ -227,10 +293,71 @@ async function checkQuota(env: Env, dailyLimit: number, monthlyLimit: number): P
   return usage;
 }
 
-async function recordQuota(env: Env, usage: Usage): Promise<void> {
+async function recordQuota(env: Env, usage: Usage, key = USAGE_KEY): Promise<void> {
   usage.dayCount += 1;
   usage.monthCount += 1;
-  await env.RECAP_USAGE.put(USAGE_KEY, JSON.stringify(usage));
+  await env.RECAP_USAGE.put(key, JSON.stringify(usage));
+}
+
+function validateLocalBookstoreRequest(payload: unknown): LocalBookstoreSearchRequest | Response {
+  if (!isRecord(payload) || typeof payload.title !== "string" || typeof payload.location !== "string") {
+    return json({ error: "title and location are required." }, 400);
+  }
+  const title = payload.title.trim().slice(0, 300);
+  const location = payload.location.trim().slice(0, 300);
+  if (!title || !location) return json({ error: "title and location are required." }, 400);
+  const author = typeof payload.author === "string" ? payload.author.trim().slice(0, 300) : null;
+  const isbn = typeof payload.isbn === "string" ? payload.isbn.replace(/[^0-9Xx]/g, "").slice(0, 13) : null;
+  return { title, location, author: author || null, isbn: isbn || null };
+}
+
+function requestLocalBookstores(env: Env, search: LocalBookstoreSearchRequest): Promise<Response> {
+  return fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "gpt-5.5",
+      store: false,
+      max_output_tokens: 1_600,
+      reasoning: { effort: "low" },
+      tools: [{ type: "web_search", search_context_size: "medium" }],
+      tool_choice: "required",
+      instructions: [
+        "Find nearby independent bookstores and check their public websites for the requested book.",
+        "First identify independent bookstores in the supplied city-level location. Then search each promising store's own website for the exact ISBN when supplied, otherwise the title and author.",
+        "Return at most five stores. Exclude chains, marketplaces, publishers, Amazon, Bookshop.org, libraries, and stores outside the supplied location.",
+        "Use listed_available only when the store's own public page explicitly says the book is in stock or available now. Use check_with_store when you found a relevant local store but its website does not clearly confirm availability. Never infer stock from a generic search result.",
+        "Every result must use a direct public URL from that store's website as sourceURL. Do not return a store without that URL.",
+        "Return JSON only, with this exact shape: {\"stores\":[{\"name\":string,\"availability\":\"listed_available\"|\"check_with_store\",\"detail\":string,\"sourceURL\":string}]}. Keep detail under 180 characters and describe only what the source supports."
+      ].join(" "),
+      input: JSON.stringify(search)
+    })
+  });
+}
+
+function localBookstoreResults(response: OpenAIResponse): LocalBookstoreResult[] | null {
+  const text = outputText(response).trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
+  let payload: unknown;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!isRecord(payload) || !Array.isArray(payload.stores)) return null;
+  const stores: LocalBookstoreResult[] = [];
+  for (const value of payload.stores.slice(0, 5)) {
+    if (!isRecord(value) || typeof value.name !== "string" || typeof value.detail !== "string" || typeof value.sourceURL !== "string") continue;
+    if (value.availability !== "listed_available" && value.availability !== "check_with_store") continue;
+    if (!/^https:\/\//.test(value.sourceURL)) continue;
+    const name = value.name.trim().slice(0, 160);
+    const detail = value.detail.trim().slice(0, 180);
+    if (!name || !detail) continue;
+    stores.push({ name, detail, sourceURL: value.sourceURL, availability: value.availability });
+  }
+  return stores;
 }
 
 function recapPrompt(request: RecapRequest): string {
@@ -269,7 +396,9 @@ function recapInstructions(recapType: RecapRequest["recapType"], useWebSearch = 
     "Use the reader's ratings and reviews only as personal context, not as facts about the books.",
     "Use clear sections or paragraphs when that helps. If you cannot reliably identify a supplied book, say so only for that book; do not let sparse reader notes weaken a recap for a recognizable completed book.",
     ...(compact ? [
-      "The previous draft exceeded its space limit. Rewrite a complete, compact recap that fits this response: preserve every supplied book's key plot turns and ending, especially the latest book's final revelations, and use shorter sections rather than dropping the conclusion."
+      recapType === "book"
+        ? "The previous draft exceeded its space limit. Rewrite as a complete 700-to-900-word summary. Prioritize the plot turns, ending, and unresolved threads; use compact paragraphs rather than dropping the conclusion."
+        : "The previous draft exceeded its space limit. Rewrite a complete, compact recap that fits this response: preserve every supplied book's key plot turns and ending, especially the latest book's final revelations, and use shorter sections rather than dropping the conclusion."
     ] : [])
   ].join(" ");
 }
@@ -320,6 +449,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function json(body: Record<string, string>, status = 200): Response {
+function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }

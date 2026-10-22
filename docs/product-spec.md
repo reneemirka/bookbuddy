@@ -677,14 +677,6 @@ These frequencies may be adjusted as the backend architecture and API limitation
 
 Notify when a relevant new book is announced.
 
-### Approximately 3 months
-
-Remind the user why they cared:
-
-- Ratings
-- Reviews
-- Reading history
-
 ### Approximately 1 month
 
 Resurface:
@@ -693,6 +685,9 @@ Resurface:
 - Ratings
 - Personal comments
 - Reading history
+
+When available, include the reader's average rating for the earlier books in
+the series.
 
 ### Approximately 1 week
 
@@ -705,6 +700,13 @@ Generate:
 Notify:
 
 > **It's out!**
+
+Offer a way to find local bookstores. Book Buddy must not claim a store has a
+copy unless availability was verified from that store or an inventory partner.
+This is an on-demand action: use the reader's supplied city or area and the
+book title/ISBN to search public bookstore sites. Do not send a precise device
+location to the search provider, and label listings without explicit stock
+evidence as requiring confirmation from the store.
 
 The release item remains on Radar until the reader reads or dismisses it, unless its source is unfollowed.
 
@@ -1352,7 +1354,6 @@ Implement:
 
 Using known release dates, schedule notifications such as:
 
-- Approximately 3 months before release
 - Approximately 1 month before release
 - Approximately 1 week before release
 - Release day
@@ -1509,7 +1510,6 @@ The monitoring worker should primarily notify the user about information the pho
 
 Once the iPhone knows a release date, it should continue using **local notifications** for:
 
-- 3-month reminder
 - 1-month reminder
 - 1-week reminder
 - Release day

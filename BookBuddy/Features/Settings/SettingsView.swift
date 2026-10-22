@@ -257,6 +257,7 @@ struct SettingsView: View {
         do { try await MonitoringSubscriptionService.sync(context: modelContext); message = "Monitoring preferences synced." }
         catch { message = error.localizedDescription }
     }
+
 }
 
 private struct GoodreadsImportOptionsView: View {

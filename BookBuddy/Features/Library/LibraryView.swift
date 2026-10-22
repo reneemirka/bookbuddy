@@ -56,6 +56,19 @@ struct LibraryView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 8)
 
+                if selectedSection == .books && hasBookFilters {
+                    HStack {
+                        Label("Book filters active", systemImage: "line.3.horizontal.decrease.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Clear Book Filters", action: clearBookFilters)
+                            .font(.caption.weight(.semibold))
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+                }
+
                 libraryContent
             }
             .navigationTitle("Library")
@@ -125,13 +138,6 @@ struct LibraryView: View {
                 List {
                     if displayedBooks.isEmpty {
                         noMatches("books")
-                        if hasBookFilters {
-                            Button("Clear Book Filters") {
-                                clearBookFilters()
-                            }
-                            .frame(maxWidth: .infinity)
-                            .listRowBackground(Color.clear)
-                        }
                     }
                     ForEach(displayedBooks) { userBook in
                         if let book = userBook.book {

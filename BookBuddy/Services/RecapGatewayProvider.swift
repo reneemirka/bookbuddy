@@ -184,6 +184,98 @@ enum RecapGatewayError: LocalizedError {
     }
 }
 
+struct LocalBookstoreSearchResult: Decodable, Identifiable {
+    enum Availability: String, Decodable {
+        case listedAvailable = "listed_available"
+        case checkWithStore = "check_with_store"
+
+        var title: String {
+            switch self {
+            case .listedAvailable: "Listed as available"
+            case .checkWithStore: "Check with store"
+            }
+        }
+    }
+
+    let name: String
+    let availability: Availability
+    let detail: String
+    let sourceURL: URL
+    var id: String { sourceURL.absoluteString }
+}
+
+struct LocalBookstoreGatewayProvider {
+    let configuration: RecapGatewayConfiguration
+
+    func search(for book: Book, near location: String) async throws -> [LocalBookstoreSearchResult] {
+        let endpoint = Self.endpoint(for: configuration)
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 90
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(configuration.token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(LocalBookstoreRequest(book: book, location: location))
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let response = response as? HTTPURLResponse else { throw LocalBookstoreSearchError.unavailable }
+        switch response.statusCode {
+        case 200...299:
+            return try JSONDecoder().decode(LocalBookstoreResponse.self, from: data).stores
+        case 401:
+            throw LocalBookstoreSearchError.unauthorized
+        case 429:
+            throw LocalBookstoreSearchError.busy
+        default:
+            throw LocalBookstoreSearchError.unavailable
+        }
+    }
+
+    static func endpoint(for configuration: RecapGatewayConfiguration) -> URL {
+        var components = URLComponents(url: configuration.endpoint, resolvingAgainstBaseURL: false)!
+        components.path = "/v1/local-bookstores"
+        return components.url!
+    }
+}
+
+enum LocalBookstoreSearchError: LocalizedError {
+    case notConfigured
+    case unauthorized
+    case busy
+    case unavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .notConfigured:
+            "Connect the recap gateway in Settings before searching local bookstores."
+        case .unauthorized:
+            "Book Buddy could not authorize with the local bookstore search service. Check the app access token in Settings."
+        case .busy:
+            "Local bookstore search is temporarily busy. Please try again in a minute."
+        case .unavailable:
+            "Local bookstore search is temporarily unavailable. Please try again later."
+        }
+    }
+}
+
+private struct LocalBookstoreRequest: Encodable {
+    let title: String
+    let author: String?
+    let isbn: String?
+    let location: String
+
+    init(book: Book, location: String) {
+        title = book.title
+        author = book.author?.name
+        isbn = book.isbn
+        self.location = location.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+private struct LocalBookstoreResponse: Decodable {
+    let stores: [LocalBookstoreSearchResult]
+}
+
 private struct GatewayRequest: Encodable {
     let seriesName: String
     let readBooks: [GatewayBook]

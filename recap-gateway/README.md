@@ -7,6 +7,8 @@ This Cloudflare Worker is the secure server-side boundary between the Book Buddy
 - Fixed model: `gpt-6-luna`
 - Output budget: scales by the number of read books, up to 6,600 tokens
 - Default quota: 20 recaps/day and 100 recaps/month
+- Local bookstore lookups: 6/day and 24/month by default. They are always
+  reader-initiated and send only a city-level search area plus book metadata.
 - Maximum request payload: 20,000 characters
 - Gateway bearer-token check before any OpenAI request
 - OpenAI response storage disabled with `store: false`
@@ -14,6 +16,15 @@ This Cloudflare Worker is the secure server-side boundary between the Book Buddy
 - Safe error codes identify upstream authentication, billing, or model-access failures without returning provider response bodies
 
 The gateway token is an access gate, not a substitute for per-user authentication. For this personal-use MVP, keep the quotas low and rotate the token if it is exposed. A multi-user version should authenticate each user (for example, with Sign in with Apple) before permitting recap requests.
+
+## Local bookstore lookup
+
+The iPhone can use the existing recap-gateway connection to call
+`/v1/local-bookstores`. The Worker searches public sites of independent
+bookstores in the reader's supplied city or area. A result is marked **Listed
+as available** only when that store's own page explicitly supports it;
+otherwise it is labeled **Check with store**. The feature never runs in the
+background and does not receive a precise device location.
 
 ## Background monitoring
 
