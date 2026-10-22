@@ -328,11 +328,12 @@ function requestLocalBookstores(env: Env, search: LocalBookstoreSearchRequest): 
       tools: [{ type: "web_search", search_context_size: "medium" }],
       tool_choice: "required",
       instructions: [
-        "Find nearby independent bookstores and check their public websites for the requested book.",
-        "First identify independent bookstores in the supplied city-level location. Then search each promising store's own website for the exact ISBN when supplied, otherwise the title and author.",
-        "Return at most five stores. Exclude chains, marketplaces, publishers, Amazon, Bookshop.org, libraries, and stores outside the supplied location.",
-        "For available_now searches, use listed_available only when the store's own public page explicitly says the book is in stock or available now. For preorder searches, use preorder_available only when the store's own public page explicitly offers a preorder for this exact book. Use check_with_store when you found a relevant local store but its website does not clearly confirm the requested availability. Never infer stock or preorder availability from a generic search result.",
-        "Every result must use a direct public URL from that store's website as sourceURL. Do not return a store without that URL.",
+        "Find nearby general-interest bookstores and check their public websites for the requested book.",
+        "First identify independent bookstores in the supplied city-level location. Also include practical nearby national booksellers, especially Barnes & Noble when it has a local store. Prioritize independent bookstores first, then rank by practical proximity to the supplied area.",
+        "Search each promising store's own website for the exact ISBN when supplied, otherwise the title and author. Aim to return three to five relevant stores when they exist, rather than returning a single result.",
+        "Exclude churches, religious-supply shops, gift-only shops, specialty stores, marketplaces, publishers, Amazon, Bookshop.org, libraries, and stores outside the supplied location—unless that store's own direct product page explicitly lists this exact book.",
+        "For available_now searches, use listed_available only when the store's own direct product page explicitly says the book is in stock or available now. For preorder searches, use preorder_available only when the store's own direct product page explicitly offers a preorder for this exact book. For a general-interest bookstore that is nearby but has no confirmed listing, use check_with_store and say plainly that online availability was not confirmed. Never infer stock or preorder availability from a generic store, location, about, or category page.",
+        "An available or preorder result must use that direct title/ISBN product or catalog-result page from the store's own website as sourceURL. A check_with_store result may use the official nearby bookstore's own location or storefront page, but never a directory, review site, or generic search result.",
         "Return JSON only, with this exact shape: {\"stores\":[{\"name\":string,\"availability\":\"listed_available\"|\"preorder_available\"|\"check_with_store\",\"detail\":string,\"sourceURL\":string}]}. Keep detail under 180 characters and describe only what the source supports."
       ].join(" "),
       input: JSON.stringify(search)
@@ -357,6 +358,9 @@ function localBookstoreResults(response: OpenAIResponse): LocalBookstoreResult[]
     const name = value.name.trim().slice(0, 160);
     const detail = value.detail.trim().slice(0, 180);
     if (!name || !detail) continue;
+    // A church or religious-supply shop without a confirmed direct listing is
+    // not a useful nearby-bookseller suggestion for a general release.
+    if (value.availability === "check_with_store" && /\b(church|religious|catholic|christian)\b/i.test(name)) continue;
     stores.push({ name, detail, sourceURL: value.sourceURL, availability: value.availability });
   }
   return stores;

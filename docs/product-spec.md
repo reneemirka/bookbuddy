@@ -710,6 +710,10 @@ evidence as requiring confirmation from the store.
 For upcoming Radar books, offer a separate on-demand preorder search and only
 label a result as preorder-available when the store's own page explicitly
 offers that exact book for preorder.
+Prioritize independent general-interest bookstores, but include nearby national
+booksellers as practical options. Never show a church, religious-supply, gift,
+or specialty store from a generic site or location page; it needs a direct
+listing for the requested book.
 
 The release item remains on Radar until the reader reads or dismisses it, unless its source is unfollowed.
 
