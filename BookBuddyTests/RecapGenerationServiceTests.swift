@@ -65,6 +65,22 @@ final class RecapGenerationServiceTests: XCTestCase {
         )
     }
 
+    func testLocalBookstoreResultDistinguishesAConfirmedPreorder() throws {
+        let data = """
+        {
+          "name": "Example Books",
+          "availability": "preorder_available",
+          "detail": "Preorder listed for the hardcover edition.",
+          "sourceURL": "https://example.com/preorders/book"
+        }
+        """.data(using: .utf8)!
+
+        let result = try JSONDecoder().decode(LocalBookstoreSearchResult.self, from: data)
+
+        XCTAssertEqual(result.availability, .preorderAvailable)
+        XCTAssertEqual(result.availability.title, "Preorder available")
+    }
+
     @MainActor
     func testBookSummaryRequiresReadBook() throws {
         let context = try makeContext()

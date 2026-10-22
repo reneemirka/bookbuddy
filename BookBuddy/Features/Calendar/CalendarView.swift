@@ -252,6 +252,9 @@ struct ReleaseDetailView: View {
                     NavigationLink("Search Nearby Bookstores") {
                         LocalBookstoreFinderView(book: book)
                     }
+                    NavigationLink("Search for Preorders") {
+                        LocalBookstoreFinderView(book: book, initialPurpose: .preorder)
+                    }
                 }
             }
             let series = release.book?.seriesMemberships.compactMap(\.series) ?? []
@@ -270,12 +273,18 @@ struct ReleaseDetailView: View {
 
 struct LocalBookstoreFinderView: View {
     let book: Book
+    @State private var purpose: LocalBookstoreSearchPurpose
     @State private var location = ""
     @State private var isLocating = false
     @State private var isSearching = false
     @State private var results: [LocalBookstoreSearchResult] = []
     @State private var errorMessage: String?
     @State private var didSearch = false
+
+    init(book: Book, initialPurpose: LocalBookstoreSearchPurpose = .availableNow) {
+        self.book = book
+        _purpose = State(initialValue: initialPurpose)
+    }
 
     var body: some View {
         List {
@@ -286,6 +295,12 @@ struct LocalBookstoreFinderView: View {
             }
 
             Section("Search Area") {
+                Picker("Looking for", selection: $purpose) {
+                    ForEach(LocalBookstoreSearchPurpose.allCases) { purpose in
+                        Text(purpose.title).tag(purpose)
+                    }
+                }
+                .pickerStyle(.segmented)
                 TextField("City or area", text: $location)
                     .textInputAutocapitalization(.words)
                 Button {
@@ -305,6 +320,7 @@ struct LocalBookstoreFinderView: View {
                     search()
                 } label: {
                     if isSearching { Label("Checking Bookstore Sites…", systemImage: "magnifyingglass") }
+                    else if purpose == .preorder { Label("Search for Preorders", systemImage: "cart") }
                     else { Label("Find It Locally", systemImage: "books.vertical") }
                 }
                 .disabled(location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSearching || isLocating)
@@ -319,7 +335,7 @@ struct LocalBookstoreFinderView: View {
                                 Spacer()
                                 Text(result.availability.title)
                                     .font(.caption.weight(.semibold))
-                                    .foregroundStyle(result.availability == .listedAvailable ? .green : .orange)
+                                    .foregroundStyle(result.availability == .checkWithStore ? .orange : .green)
                             }
                             Text(result.detail).font(.subheadline).foregroundStyle(.secondary)
                             Link("Open Store Listing", destination: result.sourceURL)
@@ -364,7 +380,7 @@ struct LocalBookstoreFinderView: View {
                 guard let configuration = try RecapGatewayCredentialsStore.shared.configuration() else {
                     throw LocalBookstoreSearchError.notConfigured
                 }
-                results = try await LocalBookstoreGatewayProvider(configuration: configuration).search(for: book, near: location)
+                results = try await LocalBookstoreGatewayProvider(configuration: configuration).search(for: book, near: location, purpose: purpose)
                 didSearch = true
             } catch {
                 errorMessage = error.localizedDescription

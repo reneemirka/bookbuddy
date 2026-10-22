@@ -40,11 +40,12 @@ interface LocalBookstoreSearchRequest {
   author?: string | null;
   isbn?: string | null;
   location: string;
+  purpose: "available_now" | "preorder";
 }
 
 interface LocalBookstoreResult {
   name: string;
-  availability: "listed_available" | "check_with_store";
+  availability: "listed_available" | "preorder_available" | "check_with_store";
   detail: string;
   sourceURL: string;
 }
@@ -308,7 +309,8 @@ function validateLocalBookstoreRequest(payload: unknown): LocalBookstoreSearchRe
   if (!title || !location) return json({ error: "title and location are required." }, 400);
   const author = typeof payload.author === "string" ? payload.author.trim().slice(0, 300) : null;
   const isbn = typeof payload.isbn === "string" ? payload.isbn.replace(/[^0-9Xx]/g, "").slice(0, 13) : null;
-  return { title, location, author: author || null, isbn: isbn || null };
+  const purpose = payload.purpose === "preorder" ? "preorder" : "available_now";
+  return { title, location, author: author || null, isbn: isbn || null, purpose };
 }
 
 function requestLocalBookstores(env: Env, search: LocalBookstoreSearchRequest): Promise<Response> {
@@ -329,9 +331,9 @@ function requestLocalBookstores(env: Env, search: LocalBookstoreSearchRequest): 
         "Find nearby independent bookstores and check their public websites for the requested book.",
         "First identify independent bookstores in the supplied city-level location. Then search each promising store's own website for the exact ISBN when supplied, otherwise the title and author.",
         "Return at most five stores. Exclude chains, marketplaces, publishers, Amazon, Bookshop.org, libraries, and stores outside the supplied location.",
-        "Use listed_available only when the store's own public page explicitly says the book is in stock or available now. Use check_with_store when you found a relevant local store but its website does not clearly confirm availability. Never infer stock from a generic search result.",
+        "For available_now searches, use listed_available only when the store's own public page explicitly says the book is in stock or available now. For preorder searches, use preorder_available only when the store's own public page explicitly offers a preorder for this exact book. Use check_with_store when you found a relevant local store but its website does not clearly confirm the requested availability. Never infer stock or preorder availability from a generic search result.",
         "Every result must use a direct public URL from that store's website as sourceURL. Do not return a store without that URL.",
-        "Return JSON only, with this exact shape: {\"stores\":[{\"name\":string,\"availability\":\"listed_available\"|\"check_with_store\",\"detail\":string,\"sourceURL\":string}]}. Keep detail under 180 characters and describe only what the source supports."
+        "Return JSON only, with this exact shape: {\"stores\":[{\"name\":string,\"availability\":\"listed_available\"|\"preorder_available\"|\"check_with_store\",\"detail\":string,\"sourceURL\":string}]}. Keep detail under 180 characters and describe only what the source supports."
       ].join(" "),
       input: JSON.stringify(search)
     })
@@ -350,7 +352,7 @@ function localBookstoreResults(response: OpenAIResponse): LocalBookstoreResult[]
   const stores: LocalBookstoreResult[] = [];
   for (const value of payload.stores.slice(0, 5)) {
     if (!isRecord(value) || typeof value.name !== "string" || typeof value.detail !== "string" || typeof value.sourceURL !== "string") continue;
-    if (value.availability !== "listed_available" && value.availability !== "check_with_store") continue;
+    if (value.availability !== "listed_available" && value.availability !== "preorder_available" && value.availability !== "check_with_store") continue;
     if (!/^https:\/\//.test(value.sourceURL)) continue;
     const name = value.name.trim().slice(0, 160);
     const detail = value.detail.trim().slice(0, 180);

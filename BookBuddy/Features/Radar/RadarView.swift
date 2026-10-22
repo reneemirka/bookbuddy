@@ -38,7 +38,11 @@ struct RadarView: View {
                         if !radarReleases.isEmpty {
                             Section("Releases") {
                                 ForEach(radarReleases) { release in
-                                    ReleaseRadarRow(release: release, reason: relevanceReason(for: release))
+                                    NavigationLink {
+                                        ReleaseDetailView(release: release)
+                                    } label: {
+                                        ReleaseRadarRow(release: release, reason: relevanceReason(for: release))
+                                    }
                                         .swipeActions { Button("Dismiss", systemImage: "eye.slash", role: .destructive) { release.radarDismissedAt = .now; try? modelContext.save() } }
                                 }
                             }

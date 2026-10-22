@@ -707,6 +707,9 @@ This is an on-demand action: use the reader's supplied city or area and the
 book title/ISBN to search public bookstore sites. Do not send a precise device
 location to the search provider, and label listings without explicit stock
 evidence as requiring confirmation from the store.
+For upcoming Radar books, offer a separate on-demand preorder search and only
+label a result as preorder-available when the store's own page explicitly
+offers that exact book for preorder.
 
 The release item remains on Radar until the reader reads or dismisses it, unless its source is unfollowed.
 

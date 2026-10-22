@@ -185,13 +185,15 @@ enum RecapGatewayError: LocalizedError {
 }
 
 struct LocalBookstoreSearchResult: Decodable, Identifiable {
-    enum Availability: String, Decodable {
+    enum Availability: String, Decodable, Equatable {
         case listedAvailable = "listed_available"
+        case preorderAvailable = "preorder_available"
         case checkWithStore = "check_with_store"
 
         var title: String {
             switch self {
             case .listedAvailable: "Listed as available"
+            case .preorderAvailable: "Preorder available"
             case .checkWithStore: "Check with store"
             }
         }
@@ -204,10 +206,23 @@ struct LocalBookstoreSearchResult: Decodable, Identifiable {
     var id: String { sourceURL.absoluteString }
 }
 
+enum LocalBookstoreSearchPurpose: String, Codable, CaseIterable, Identifiable {
+    case availableNow = "available_now"
+    case preorder
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .availableNow: "Available Now"
+        case .preorder: "Preorders"
+        }
+    }
+}
+
 struct LocalBookstoreGatewayProvider {
     let configuration: RecapGatewayConfiguration
 
-    func search(for book: Book, near location: String) async throws -> [LocalBookstoreSearchResult] {
+    func search(for book: Book, near location: String, purpose: LocalBookstoreSearchPurpose = .availableNow) async throws -> [LocalBookstoreSearchResult] {
         let endpoint = Self.endpoint(for: configuration)
 
         var request = URLRequest(url: endpoint)
@@ -215,7 +230,7 @@ struct LocalBookstoreGatewayProvider {
         request.timeoutInterval = 90
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(configuration.token)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONEncoder().encode(LocalBookstoreRequest(book: book, location: location))
+        request.httpBody = try JSONEncoder().encode(LocalBookstoreRequest(book: book, location: location, purpose: purpose))
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let response = response as? HTTPURLResponse else { throw LocalBookstoreSearchError.unavailable }
@@ -263,12 +278,14 @@ private struct LocalBookstoreRequest: Encodable {
     let author: String?
     let isbn: String?
     let location: String
+    let purpose: LocalBookstoreSearchPurpose
 
-    init(book: Book, location: String) {
+    init(book: Book, location: String, purpose: LocalBookstoreSearchPurpose) {
         title = book.title
         author = book.author?.name
         isbn = book.isbn
         self.location = location.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.purpose = purpose
     }
 }
 
