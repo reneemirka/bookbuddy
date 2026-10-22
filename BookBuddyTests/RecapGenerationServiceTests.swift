@@ -81,6 +81,10 @@ final class RecapGenerationServiceTests: XCTestCase {
         XCTAssertEqual(result.availability.title, "Preorder available")
     }
 
+    func testUnavailableLocationExplainsHowToContinue() {
+        XCTAssertTrue(CurrentLocalityError.unavailable.errorDescription?.contains("Enter a city manually") == true)
+    }
+
     @MainActor
     func testBookSummaryRequiresReadBook() throws {
         let context = try makeContext()

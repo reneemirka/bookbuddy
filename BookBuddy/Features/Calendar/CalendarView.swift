@@ -279,6 +279,7 @@ struct LocalBookstoreFinderView: View {
     @State private var isSearching = false
     @State private var results: [LocalBookstoreSearchResult] = []
     @State private var errorMessage: String?
+    @State private var errorTitle = "Couldn’t Search Local Bookstores"
     @State private var didSearch = false
 
     init(book: Book, initialPurpose: LocalBookstoreSearchPurpose = .availableNow) {
@@ -349,7 +350,7 @@ struct LocalBookstoreFinderView: View {
         }
         .navigationTitle("Find It Locally")
         .navigationBarTitleDisplayMode(.inline)
-        .alert("Couldn’t Search Local Bookstores", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+        .alert(errorTitle, isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage ?? "")
@@ -364,6 +365,7 @@ struct LocalBookstoreFinderView: View {
                 let localityService = CurrentLocalityService()
                 location = try await localityService.locality()
             } catch {
+                errorTitle = "Couldn’t Use Current Location"
                 errorMessage = error.localizedDescription
             }
         }
@@ -371,6 +373,7 @@ struct LocalBookstoreFinderView: View {
 
     private func search() {
         isSearching = true
+        errorTitle = "Couldn’t Search Local Bookstores"
         errorMessage = nil
         didSearch = false
         results = []
@@ -447,19 +450,26 @@ private final class CurrentLocalityService: NSObject, CLLocationManagerDelegate 
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        locationContinuation?.resume(throwing: error)
+        // The Simulator commonly reports kCLErrorDomain error 0 when it has no
+        // simulated location. The raw platform error is not useful to readers.
+        locationContinuation?.resume(throwing: CurrentLocalityError.unavailable)
         locationContinuation = nil
     }
 }
 
-private enum CurrentLocalityError: LocalizedError {
+enum CurrentLocalityError: LocalizedError {
     case permissionDenied
     case unavailable
 
     var errorDescription: String? {
         switch self {
         case .permissionDenied: "Allow location access to use your current city, or enter a city manually."
-        case .unavailable: "Book Buddy could not determine your city. Enter one manually instead."
+        case .unavailable:
+            #if targetEnvironment(simulator)
+            "The Simulator does not have a location. Enter a city manually, or set one in Xcode’s Debug > Location menu."
+            #else
+            "Book Buddy could not determine your city. Enter one manually instead."
+            #endif
         }
     }
 }
