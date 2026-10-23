@@ -203,7 +203,15 @@ struct LocalBookstoreSearchResult: Decodable, Identifiable {
     let availability: Availability
     let detail: String
     let sourceURL: URL
+    let candidateID: String?
     var id: String { sourceURL.absoluteString }
+}
+
+struct LocalBookstoreCandidate: Encodable, Identifiable {
+    let id: String
+    let name: String
+    let address: String
+    let distanceMiles: Double
 }
 
 enum LocalBookstoreSearchPurpose: String, Codable, CaseIterable, Identifiable {
@@ -222,7 +230,7 @@ enum LocalBookstoreSearchPurpose: String, Codable, CaseIterable, Identifiable {
 struct LocalBookstoreGatewayProvider {
     let configuration: RecapGatewayConfiguration
 
-    func search(for book: Book, near location: String, purpose: LocalBookstoreSearchPurpose = .availableNow) async throws -> [LocalBookstoreSearchResult] {
+    func search(for book: Book, near location: String, candidates: [LocalBookstoreCandidate], purpose: LocalBookstoreSearchPurpose = .availableNow) async throws -> [LocalBookstoreSearchResult] {
         let endpoint = Self.endpoint(for: configuration)
 
         var request = URLRequest(url: endpoint)
@@ -230,7 +238,7 @@ struct LocalBookstoreGatewayProvider {
         request.timeoutInterval = 90
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(configuration.token)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONEncoder().encode(LocalBookstoreRequest(book: book, location: location, purpose: purpose))
+        request.httpBody = try JSONEncoder().encode(LocalBookstoreRequest(book: book, location: location, candidates: candidates, purpose: purpose))
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let response = response as? HTTPURLResponse else { throw LocalBookstoreSearchError.unavailable }
@@ -258,6 +266,7 @@ enum LocalBookstoreSearchError: LocalizedError {
     case unauthorized
     case busy
     case unavailable
+    case noNearbyBookstores
 
     var errorDescription: String? {
         switch self {
@@ -269,6 +278,8 @@ enum LocalBookstoreSearchError: LocalizedError {
             "Local bookstore search is temporarily busy. Please try again in a minute."
         case .unavailable:
             "Local bookstore search is temporarily unavailable. Please try again later."
+        case .noNearbyBookstores:
+            "Book Buddy could not find bookstores near this area. Try a nearby city instead."
         }
     }
 }
@@ -278,13 +289,15 @@ private struct LocalBookstoreRequest: Encodable {
     let author: String?
     let isbn: String?
     let location: String
+    let candidates: [LocalBookstoreCandidate]
     let purpose: LocalBookstoreSearchPurpose
 
-    init(book: Book, location: String, purpose: LocalBookstoreSearchPurpose) {
+    init(book: Book, location: String, candidates: [LocalBookstoreCandidate], purpose: LocalBookstoreSearchPurpose) {
         title = book.title
         author = book.author?.name
         isbn = book.isbn
         self.location = location.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.candidates = candidates
         self.purpose = purpose
     }
 }

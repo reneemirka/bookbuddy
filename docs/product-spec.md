@@ -714,6 +714,10 @@ Prioritize independent general-interest bookstores, but include nearby national
 booksellers as practical options. Never show a church, religious-supply, gift,
 or specialty store from a generic site or location page; it needs a direct
 listing for the requested book.
+Use Apple Maps on the reader's device to identify and rank nearby bookstores by
+measured local distance before sending the resulting store shortlist to the web search
+provider. The shortlist may include store names, addresses, and rounded
+distances, but never the reader's precise coordinates.
 
 The release item remains on Radar until the reader reads or dismisses it, unless its source is unfollowed.
 

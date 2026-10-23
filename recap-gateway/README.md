@@ -20,11 +20,12 @@ The gateway token is an access gate, not a substitute for per-user authenticatio
 ## Local bookstore lookup
 
 The iPhone can use the existing recap-gateway connection to call
-`/v1/local-bookstores`. The Worker searches public sites of independent
-bookstores in the reader's supplied city or area. A result is marked **Listed
-as available** only when that store's own page explicitly supports it;
-otherwise it is labeled **Check with store**. The feature never runs in the
-background and does not receive a precise device location.
+`/v1/local-bookstores`. Apple Maps on the phone first makes a nearby-store
+shortlist and orders it by measured local distance. The Worker searches public
+pages for only those stores; it receives store names, addresses, and rounded
+distances, never precise device coordinates. A result is marked **Listed as
+available** only when that store's own page explicitly supports it; otherwise
+it is labeled **Check with store**. The feature never runs in the background.
 
 ## Background monitoring
 

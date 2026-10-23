@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 @preconcurrency import CoreLocation
+import MapKit
 
 struct CalendarView: View {
     private enum DisplayMode: String, CaseIterable, Identifiable {
@@ -278,6 +279,8 @@ struct LocalBookstoreFinderView: View {
     @State private var isLocating = false
     @State private var isSearching = false
     @State private var results: [LocalBookstoreSearchResult] = []
+    @State private var candidates: [LocalBookstoreCandidate] = []
+    @State private var currentLocationArea: LocalBookstoreSearchArea?
     @State private var errorMessage: String?
     @State private var errorTitle = "Couldn’t Search Local Bookstores"
     @State private var didSearch = false
@@ -329,7 +332,7 @@ struct LocalBookstoreFinderView: View {
 
             if !results.isEmpty {
                 Section("Nearby Bookstores") {
-                    ForEach(results) { result in
+                    ForEach(sortedResults) { result in
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
                                 Text(result.name).font(.headline)
@@ -339,6 +342,11 @@ struct LocalBookstoreFinderView: View {
                                     .foregroundStyle(result.availability == .checkWithStore ? .orange : .green)
                             }
                             Text(result.detail).font(.subheadline).foregroundStyle(.secondary)
+                            if let distance = distance(for: result) {
+                                Text("\(distance.formatted(.number.precision(.fractionLength(1)))) mi away")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                             Link("Open Store Listing", destination: result.sourceURL)
                         }
                         .padding(.vertical, 3)
@@ -363,7 +371,9 @@ struct LocalBookstoreFinderView: View {
             defer { isLocating = false }
             do {
                 let localityService = CurrentLocalityService()
-                location = try await localityService.locality()
+                let area = try await localityService.searchArea()
+                location = area.name
+                currentLocationArea = area
             } catch {
                 errorTitle = "Couldn’t Use Current Location"
                 errorMessage = error.localizedDescription
@@ -377,18 +387,37 @@ struct LocalBookstoreFinderView: View {
         errorMessage = nil
         didSearch = false
         results = []
+        candidates = []
         Task {
             defer { isSearching = false }
             do {
                 guard let configuration = try RecapGatewayCredentialsStore.shared.configuration() else {
                     throw LocalBookstoreSearchError.notConfigured
                 }
-                results = try await LocalBookstoreGatewayProvider(configuration: configuration).search(for: book, near: location, purpose: purpose)
+                let area = try await resolvedSearchArea()
+                let localCandidates = try await LocalBookstoreMapService.nearbyBookstores(around: area.location)
+                guard !localCandidates.isEmpty else { throw LocalBookstoreSearchError.noNearbyBookstores }
+                candidates = localCandidates
+                results = try await LocalBookstoreGatewayProvider(configuration: configuration).search(for: book, near: area.name, candidates: localCandidates, purpose: purpose)
                 didSearch = true
             } catch {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+
+    private var sortedResults: [LocalBookstoreSearchResult] {
+        results.sorted { (distance(for: $0) ?? .greatestFiniteMagnitude) < (distance(for: $1) ?? .greatestFiniteMagnitude) }
+    }
+
+    private func distance(for result: LocalBookstoreSearchResult) -> Double? {
+        guard let candidateID = result.candidateID else { return nil }
+        return candidates.first(where: { $0.id == candidateID })?.distanceMiles
+    }
+
+    private func resolvedSearchArea() async throws -> LocalBookstoreSearchArea {
+        if let currentLocationArea, currentLocationArea.name == location { return currentLocationArea }
+        return try await LocalBookstoreMapService.searchArea(named: location)
     }
 }
 
@@ -402,7 +431,7 @@ private final class CurrentLocalityService: NSObject, CLLocationManagerDelegate 
         manager.delegate = self
     }
 
-    func locality() async throws -> String {
+    func searchArea() async throws -> LocalBookstoreSearchArea {
         if manager.authorizationStatus == .notDetermined {
             try await requestAuthorization()
         }
@@ -415,7 +444,7 @@ private final class CurrentLocalityService: NSObject, CLLocationManagerDelegate 
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         guard !parts.isEmpty else { throw CurrentLocalityError.unavailable }
-        return parts.joined(separator: ", ")
+        return LocalBookstoreSearchArea(name: parts.joined(separator: ", "), location: location)
     }
 
     private func requestAuthorization() async throws {
@@ -454,6 +483,59 @@ private final class CurrentLocalityService: NSObject, CLLocationManagerDelegate 
         // simulated location. The raw platform error is not useful to readers.
         locationContinuation?.resume(throwing: CurrentLocalityError.unavailable)
         locationContinuation = nil
+    }
+}
+
+private struct LocalBookstoreSearchArea {
+    let name: String
+    let location: CLLocation
+}
+
+private enum LocalBookstoreMapService {
+    static func searchArea(named name: String) async throws -> LocalBookstoreSearchArea {
+        guard let placemark = try await CLGeocoder().geocodeAddressString(name).first,
+              let location = placemark.location
+        else { throw CurrentLocalityError.unavailable }
+        return LocalBookstoreSearchArea(name: name, location: location)
+    }
+
+    static func nearbyBookstores(around origin: CLLocation) async throws -> [LocalBookstoreCandidate] {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = "bookstore"
+        request.region = MKCoordinateRegion(
+            center: origin.coordinate,
+            latitudinalMeters: 80_000,
+            longitudinalMeters: 80_000
+        )
+        let response = try await MKLocalSearch(request: request).start()
+        let sorted = response.mapItems.compactMap { item -> (name: String, address: String, distance: Double)? in
+            guard let name = item.name,
+                  let location = item.placemark.location,
+                  !isExcludedStore(name)
+            else { return nil }
+            let address = item.placemark.title ?? name
+            return (name, address, origin.distance(from: location) / 1_609.344)
+        }
+        .sorted { $0.distance < $1.distance }
+
+        var seen = Set<String>()
+        return sorted.compactMap { store in
+            let key = store.name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            guard seen.insert(key).inserted else { return nil }
+            return LocalBookstoreCandidate(
+                id: "store-\(seen.count)",
+                name: store.name,
+                address: store.address,
+                distanceMiles: (store.distance * 10).rounded() / 10
+            )
+        }
+        .prefix(12)
+        .map { $0 }
+    }
+
+    private static func isExcludedStore(_ name: String) -> Bool {
+        let normalized = name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        return ["church", "religious", "catholic", "christian"].contains { normalized.contains($0) }
     }
 }
 

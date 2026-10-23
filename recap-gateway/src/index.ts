@@ -40,7 +40,15 @@ interface LocalBookstoreSearchRequest {
   author?: string | null;
   isbn?: string | null;
   location: string;
+  candidates: LocalBookstoreCandidate[];
   purpose: "available_now" | "preorder";
+}
+
+interface LocalBookstoreCandidate {
+  id: string;
+  name: string;
+  address: string;
+  distanceMiles: number;
 }
 
 interface LocalBookstoreResult {
@@ -48,6 +56,7 @@ interface LocalBookstoreResult {
   availability: "listed_available" | "preorder_available" | "check_with_store";
   detail: string;
   sourceURL: string;
+  candidateID?: string;
 }
 
 interface LocalBookstoreResponse {
@@ -201,7 +210,7 @@ async function findLocalBookstores(request: Request, env: Env): Promise<Response
   }
 
   const result = await response.json() as OpenAIResponse;
-  const stores = localBookstoreResults(result);
+  const stores = localBookstoreResults(result, search.candidates);
   if (stores === null) {
     return json({ error: "Local bookstore search returned an unexpected response.", code: "invalid_bookstore_response" }, 502);
   }
@@ -309,8 +318,22 @@ function validateLocalBookstoreRequest(payload: unknown): LocalBookstoreSearchRe
   if (!title || !location) return json({ error: "title and location are required." }, 400);
   const author = typeof payload.author === "string" ? payload.author.trim().slice(0, 300) : null;
   const isbn = typeof payload.isbn === "string" ? payload.isbn.replace(/[^0-9Xx]/g, "").slice(0, 13) : null;
+  const candidates = Array.isArray(payload.candidates)
+    ? payload.candidates.slice(0, 12).flatMap((candidate, index) => validLocalBookstoreCandidate(candidate, index) ? [candidate] : [])
+    : [];
+  if (Array.isArray(payload.candidates) && candidates.length === 0) {
+    return json({ error: "Provide at least one nearby bookstore candidate." }, 400);
+  }
   const purpose = payload.purpose === "preorder" ? "preorder" : "available_now";
-  return { title, location, author: author || null, isbn: isbn || null, purpose };
+  return { title, location, author: author || null, isbn: isbn || null, candidates, purpose };
+}
+
+function validLocalBookstoreCandidate(value: unknown, index: number): value is LocalBookstoreCandidate {
+  if (!isRecord(value) || typeof value.id !== "string" || typeof value.name !== "string" || typeof value.address !== "string" || typeof value.distanceMiles !== "number") return false;
+  return value.id === `store-${index + 1}`
+    && value.name.trim().length > 0 && value.name.length <= 160
+    && value.address.trim().length > 0 && value.address.length <= 500
+    && Number.isFinite(value.distanceMiles) && value.distanceMiles >= 0 && value.distanceMiles <= 100;
 }
 
 function requestLocalBookstores(env: Env, search: LocalBookstoreSearchRequest): Promise<Response> {
@@ -327,21 +350,32 @@ function requestLocalBookstores(env: Env, search: LocalBookstoreSearchRequest): 
       reasoning: { effort: "low" },
       tools: [{ type: "web_search", search_context_size: "medium" }],
       tool_choice: "required",
-      instructions: [
-        "Find nearby general-interest bookstores and check their public websites for the requested book.",
-        "First identify independent bookstores in the supplied city-level location. Also include practical nearby national booksellers, especially Barnes & Noble when it has a local store. Prioritize independent bookstores first, then rank by practical proximity to the supplied area.",
-        "Search each promising store's own website for the exact ISBN when supplied, otherwise the title and author. Aim to return three to five relevant stores when they exist, rather than returning a single result.",
-        "Exclude churches, religious-supply shops, gift-only shops, specialty stores, marketplaces, publishers, Amazon, Bookshop.org, libraries, and stores outside the supplied location—unless that store's own direct product page explicitly lists this exact book.",
-        "For available_now searches, use listed_available only when the store's own direct product page explicitly says the book is in stock or available now. For preorder searches, use preorder_available only when the store's own direct product page explicitly offers a preorder for this exact book. For a general-interest bookstore that is nearby but has no confirmed listing, use check_with_store and say plainly that online availability was not confirmed. Never infer stock or preorder availability from a generic store, location, about, or category page.",
-        "An available or preorder result must use that direct title/ISBN product or catalog-result page from the store's own website as sourceURL. A check_with_store result may use the official nearby bookstore's own location or storefront page, but never a directory, review site, or generic search result.",
-        "Return JSON only, with this exact shape: {\"stores\":[{\"name\":string,\"availability\":\"listed_available\"|\"preorder_available\"|\"check_with_store\",\"detail\":string,\"sourceURL\":string}]}. Keep detail under 180 characters and describe only what the source supports."
-      ].join(" "),
+      instructions: localBookstoreInstructions(search),
       input: JSON.stringify(search)
     })
   });
 }
 
-function localBookstoreResults(response: OpenAIResponse): LocalBookstoreResult[] | null {
+function localBookstoreInstructions(search: LocalBookstoreSearchRequest): string {
+  const mappedCandidates = search.candidates.length > 0
+    ? [
+        "The supplied candidate bookstores came from Apple Maps on the reader's device and are already sorted nearest-first by measured local distance.",
+        "Only evaluate these candidates; do not discover or substitute other stores. Return candidateID exactly as supplied for every result.",
+        "Candidates:",
+        ...search.candidates.map(candidate => `- ${candidate.id}: ${candidate.name}, ${candidate.address}, ${candidate.distanceMiles.toFixed(1)} miles away`)
+      ].join("\n")
+    : "No Apple Maps shortlist was supplied. Find nearby general-interest bookstores in the supplied city-level location.";
+  return [
+    "Check public bookstore websites for the requested book.",
+    mappedCandidates,
+    "Include nearby independent general-interest bookstores and practical national booksellers such as Barnes & Noble. Exclude churches, religious-supply shops, gift-only shops, specialty stores, marketplaces, publishers, Amazon, Bookshop.org, and libraries—unless that store's own direct product page explicitly lists this exact book.",
+    "For available_now searches, use listed_available only when the store's own direct product page explicitly says the book is in stock or available now. For preorder searches, use preorder_available only when the store's own direct product page explicitly offers a preorder for this exact book. For a general-interest bookstore that is nearby but has no confirmed listing, use check_with_store and say plainly that online availability was not confirmed. Never infer stock or preorder availability from a generic store, location, about, or category page.",
+    "An available or preorder result must use that direct title/ISBN product or catalog-result page from the store's own website as sourceURL. A check_with_store result may use the official nearby bookstore's own location or storefront page, but never a directory, review site, or generic search result.",
+    "Return JSON only, with this exact shape: {\"stores\":[{\"candidateID\":string,\"name\":string,\"availability\":\"listed_available\"|\"preorder_available\"|\"check_with_store\",\"detail\":string,\"sourceURL\":string}]}. Keep detail under 180 characters and describe only what the source supports."
+  ].join(" ");
+}
+
+function localBookstoreResults(response: OpenAIResponse, candidates: LocalBookstoreCandidate[]): LocalBookstoreResult[] | null {
   const text = outputText(response).trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
   let payload: unknown;
   try {
@@ -351,6 +385,7 @@ function localBookstoreResults(response: OpenAIResponse): LocalBookstoreResult[]
   }
   if (!isRecord(payload) || !Array.isArray(payload.stores)) return null;
   const stores: LocalBookstoreResult[] = [];
+  const validCandidateIDs = new Set(candidates.map(candidate => candidate.id));
   for (const value of payload.stores.slice(0, 5)) {
     if (!isRecord(value) || typeof value.name !== "string" || typeof value.detail !== "string" || typeof value.sourceURL !== "string") continue;
     if (value.availability !== "listed_available" && value.availability !== "preorder_available" && value.availability !== "check_with_store") continue;
@@ -358,10 +393,12 @@ function localBookstoreResults(response: OpenAIResponse): LocalBookstoreResult[]
     const name = value.name.trim().slice(0, 160);
     const detail = value.detail.trim().slice(0, 180);
     if (!name || !detail) continue;
+    const candidateID = typeof value.candidateID === "string" && validCandidateIDs.has(value.candidateID) ? value.candidateID : undefined;
+    if (candidates.length > 0 && !candidateID) continue;
     // A church or religious-supply shop without a confirmed direct listing is
     // not a useful nearby-bookseller suggestion for a general release.
     if (value.availability === "check_with_store" && /\b(church|religious|catholic|christian)\b/i.test(name)) continue;
-    stores.push({ name, detail, sourceURL: value.sourceURL, availability: value.availability });
+    stores.push({ name, detail, sourceURL: value.sourceURL, availability: value.availability, candidateID });
   }
   return stores;
 }

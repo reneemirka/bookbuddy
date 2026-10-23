@@ -71,7 +71,8 @@ final class RecapGenerationServiceTests: XCTestCase {
           "name": "Example Books",
           "availability": "preorder_available",
           "detail": "Preorder listed for the hardcover edition.",
-          "sourceURL": "https://example.com/preorders/book"
+          "sourceURL": "https://example.com/preorders/book",
+          "candidateID": "store-1"
         }
         """.data(using: .utf8)!
 
@@ -79,6 +80,22 @@ final class RecapGenerationServiceTests: XCTestCase {
 
         XCTAssertEqual(result.availability, .preorderAvailable)
         XCTAssertEqual(result.availability.title, "Preorder available")
+        XCTAssertEqual(result.candidateID, "store-1")
+    }
+
+    func testLocalBookstoreResultAcceptsAnOlderResponseWithoutACandidateID() throws {
+        let data = """
+        {
+          "name": "Example Books",
+          "availability": "check_with_store",
+          "detail": "Call the store to confirm.",
+          "sourceURL": "https://example.com"
+        }
+        """.data(using: .utf8)!
+
+        let result = try JSONDecoder().decode(LocalBookstoreSearchResult.self, from: data)
+
+        XCTAssertNil(result.candidateID)
     }
 
     func testUnavailableLocationExplainsHowToContinue() {
